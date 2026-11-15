@@ -181,7 +181,7 @@ closed/kegg-hover/; the list is the KEGG page's own, closed/kegg/index.json.
       var asked = new URLSearchParams(location.search).get('map'), first = 'kegg-2026';
       try { if (localStorage.getItem('closed-kegg-hover-map') === 'kegg-2017') first = 'kegg-2017'; } catch (e) {}
       if (asked && files[asked + '.svg']) first = asked;
-      api('/contents/closed/kegg/index.json', true).then(function (t) { list(JSON.parse(t)); }).catch(function () { list(null); });
+      api('/contents/closed/kegg/index.json', true).then(function (t) { buildList(JSON.parse(t)); }).catch(function () { buildList(null); });
       show(first).then(function () {   // then the other map, quietly
         Object.keys(files).forEach(function (f) { if (/\.svg$/.test(f)) load(f.replace(/\.svg$/, '')).catch(function () {}); });
       });
@@ -217,7 +217,7 @@ closed/kegg-hover/; the list is the KEGG page's own, closed/kegg/index.json.
   var closedKey = 'atlas-closed:/kegg/', shut = {};
   try { shut = JSON.parse(localStorage.getItem(closedKey) || '{}') || {}; } catch (e) {}
   var entries = null;
-  function list(index) {
+  function buildList(index) {
     if (index) entries = index;
     var box = $('hv-list'), group = null;
     box.innerHTML = '';
@@ -233,7 +233,7 @@ closed/kegg-hover/; the list is the KEGG page's own, closed/kegg/index.json.
         g.addEventListener('click', function () {
           shut[name] = !shut[name];
           try { localStorage.setItem(closedKey, JSON.stringify(shut)); } catch (x) {}
-          list();
+          buildList();
         });
         box.appendChild(g);
       }
