@@ -25,6 +25,7 @@ closed/kegg-hover/; the list is the KEGG page's own, closed/kegg/index.json.
   .hv-rail button { width: 24px; height: 24px; padding: 0; border: 0; background: none; color: #80868b; cursor: pointer; }
   .hv-rail button:hover { color: #1e2022; }
   .hv-rail svg { width: 21px; height: 21px; }
+  .hv-item, .hv-group { flex: none; text-align: left; }
   #hv-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
   .hv-item { display: block; font-size: 14px; line-height: 18px; padding: 2px 4px; border: 1px solid transparent; border-radius: 4px; color: #1e2022; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .hv-item.hv-on { background: var(--m2-accent, #4183c4); color: #fff; }
@@ -49,7 +50,7 @@ closed/kegg-hover/; the list is the KEGG page's own, closed/kegg/index.json.
   #note { color: #666; font-size: 12px; background: #fffffff0; padding: 2px 6px; border-radius: 4px; }
   #note:empty { display: none; }
   #tip { position: fixed; pointer-events: none; max-width: min(420px, calc(100vw - 16px)); white-space: pre-line; background: #fff; border: 1px solid #dadce0; border-radius: 4px; padding: 6px 8px; font-size: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.15); display: none; z-index: 5; }
-  @media (max-width: 640px) { .hv { flex-direction: column; } .hv-nav { width: auto; max-height: 150px; border-right: 0; border-bottom: 1px solid #ddd; padding-bottom: 8px; } .hv-list-shut .hv-nav { width: auto; max-height: none; } }
+  @media (max-width: 640px) { .hv { flex-direction: column; } .hv-nav { width: auto; max-height: 40vh; border-right: 0; border-bottom: 1px solid #ddd; padding-bottom: 8px; } .hv-list-shut .hv-nav { width: auto; max-height: none; } }
   #signin { max-width: 360px; margin-left: auto; margin-right: auto; padding: 48px 16px 0; font: 14px/1.4 Helvetica, Arial, sans-serif; }
   #signin input { display: block; width: 100%; box-sizing: border-box; margin: 4px 0 12px; padding: 6px 8px; border: 1px solid #dadce0; border-radius: 4px; font: inherit; }
   #signin input:focus { outline: none; border-color: #999; }
@@ -68,11 +69,11 @@ closed/kegg-hover/; the list is the KEGG page's own, closed/kegg/index.json.
   <button type="submit">Sign in</button>
 </form>
 <div class="hv hv-out" id="hv">
-  <nav class="hv-nav">
+  <div class="hv-nav">
     <div class="hv-rail"><button type="button" id="hv-fold" title="Maps" aria-label="Maps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r=".6" fill="currentColor"/><circle cx="4.5" cy="12" r=".6" fill="currentColor"/><circle cx="4.5" cy="18" r=".6" fill="currentColor"/></svg></button></div>
     <div id="hv-list"></div>
     <button type="button" id="out" title="Forget the token in this browser">Sign out</button>
-  </nav>
+  </div>
   <div class="hv-map">
     <div id="view"></div>
     <div class="hv-ctrl"><span id="note"></span><button type="button" id="zout" aria-label="Zoom out">&minus;</button><button type="button" id="zin" aria-label="Zoom in">+</button><button type="button" id="zfit" title="Whole map">Fit</button></div>
