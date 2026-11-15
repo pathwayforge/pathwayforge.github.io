@@ -447,8 +447,5 @@ div.img img{
 // No header (user, 2026-11-06: "remove top completely"): the atlas takes the whole window, 16 px from its top
 #main { padding-top: 16px; }
 
-// Pathway Forge: the header holds only the collection's name (its right click switches collections), a line in the
-// collection's colour under it
-.wrapper-masthead { margin-bottom: 0; border-bottom: 2px solid var(--forge-accent, #eee); }
-.masthead { padding: 8px 0; }
+// Pathway Forge: the header holds only the collection's name (its right click switches collections)
 .site-name { font-size: 20px; cursor: default; }

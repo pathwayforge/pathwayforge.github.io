@@ -1,5 +1,5 @@
 # The collections, one per page; the switcher on the site's title lists them in this order. accent: the collection's
-# own colour (the viewer's accent and the line under the header), a first proposal to be chosen.
+# own colour (the viewer's accent: the chosen map in the list), a first proposal to be chosen.
 - id: air
   name: Atlas of Inflammation Resolution
   path: /air/

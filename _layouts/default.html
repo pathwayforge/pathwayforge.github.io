@@ -5,7 +5,7 @@
     {% include meta.html %}
     <link rel="stylesheet" type="text/css" href="{{ site.baseurl }}/style.css?v={{ site.time | date: '%s' }}" />
     {% assign col = site.data.collections | where: "id", page.collection | first %}
-    {% if col %}<style>:root { --m2-accent: {{ col.accent }}; --forge-accent: {{ col.accent }}; }</style>{% endif %}
+    {% if col %}<style>:root { --m2-accent: {{ col.accent }}; }</style>{% endif %}
   </head>
   <body>
     <div class="wrapper-masthead">
