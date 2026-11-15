@@ -845,7 +845,8 @@ page, so its styles keep the base they were made on). The looks before (Default 
     });
     document.getElementById('m2-signout').addEventListener('click', function () {
       try { localStorage.removeItem(CLOSED_KEY); } catch (e) {}
-      ('caches' in window ? caches.delete('closed-' + CLOSED) : Promise.resolve()).catch(function () {}).then(function () { location.reload(); });
+      // the token is shared by every closed page of the site, so their kept files all go (closed-<folder>, any folder)
+      ('caches' in window ? caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k.indexOf('closed-') === 0; }).map(function (k) { return caches.delete(k); })); }) : Promise.resolve()).catch(function () {}).then(function () { location.reload(); });
     });
     if (!closedToken()) closedSignIn('');
   }
@@ -1295,7 +1296,12 @@ page, so its styles keep the base they were made on). The looks before (Default 
   }
   // Groups in the list, Open all or Close all (user, 2026-11-12), shown only when the list has groups, then the Maps
   // window shows the list; the button matching the list's state is marked (none while some are open and some closed)
-  function listGroups() { return GROUPS && maps ? groupNames().filter(function (n) { return n; }) : []; }
+  function listGroups() { return GROUPS && maps ? groupNames().concat(linkGroups(links)).filter(function (n) { return n; }) : []; }
+  function linkGroups(ls) {   // the links' groups in the order first met, no group ('') first
+    var gs = ls.some(function (l) { return !l.group; }) ? [''] : [];
+    ls.forEach(function (l) { if (l.group && gs.indexOf(l.group) < 0) gs.push(l.group); });
+    return gs;
+  }
   function formatsMark() {   // the row only when a map in the list has a letter
     var box = document.querySelector('.m2-set-formats'); if (!box) return;
     box.style.display = maps.some(formatOf) ? '' : 'none';
@@ -2487,14 +2493,22 @@ page, so its styles keep the base they were made on). The looks before (Default 
     if (!ownDone) ownEmpty();
     emptyGroups();
     // the links after the maps, in their groups (a group folds as any other); a search matches their names
-    var lg = null;
-    links.filter(function (l) { return !q || matchMap(q, l); }).forEach(function (l) {
-      if (l.group && l.group !== lg) { lg = l.group; heading(lg, !q && closed[lg]); }
-      if (l.group && !q && closed[l.group]) return;
-      var a = el('a', 'm2-item m2-link' + (l.group ? ' m2-sub' : ''));
-      a.appendChild(el('span', 'm2-name', label(l)));
-      a.href = l.url; a.title = label(l) + (l.note ? ', ' + l.note : '');
-      box.appendChild(a);
+    var hitLinks = links.filter(function (l) { return !q || matchMap(q, l); });
+    linkGroups(hitLinks).forEach(function (name) {
+      if (name) {   // a heading that folds and nothing else (no dragging, no renaming: a link group is not a map group)
+        var g = el('button', 'm2-group' + (!q && closed[name] ? ' m2-shut' : ''), name);
+        g.type = 'button'; g.setAttribute('data-group', name);
+        g.addEventListener('click', function () { closed[name] = !closed[name]; saveClosed(); buildList(document.getElementById('m2-search').value); groupsMark(); });
+        box.appendChild(g);
+        if (!q && closed[name]) return;
+      }
+      hitLinks.forEach(function (l) {
+        if ((l.group || '') !== name) return;
+        var a = el('a', 'm2-item m2-link' + (name ? ' m2-sub' : ''));
+        a.appendChild(el('span', 'm2-name', label(l)));
+        a.href = l.url; a.title = label(l) + (l.note ? ', ' + l.note : '');
+        box.appendChild(a);
+      });
     });
     mols.forEach(function (g) {
       var t = el('div', 'm2-mol', g.label);
@@ -2512,7 +2526,7 @@ page, so its styles keep the base they were made on). The looks before (Default 
         box.appendChild(b);
       });
     });
-    if (!shown.length && !mols.length) box.appendChild(el('div', 'm2-none', index && index.length || !q ? 'No match' : 'Searching…'));
+    if (!shown.length && !mols.length && !hitLinks.length) box.appendChild(el('div', 'm2-none', index && index.length || !q ? 'No match' : 'Searching…'));
     // keep the chosen map visible when the list scrolls, with about one and a half items in sight above and below it,
     // so moving up or down the list shows where it goes next (user, 2026-11-09)
     box.scrollTop = keep;
@@ -2655,11 +2669,13 @@ page, so its styles keep the base they were made on). The looks before (Default 
 
   var siteList = null;
   function setMaps(list) {
-    siteList = list;
     // a link (kind "link", url; user 2026-11-15, the KEGG hover pictures): a list entry that opens another page, kept
-    // apart from the maps, so it is never routed, stepped, loaded, counted or edited here
+    // apart from the maps (siteList included, which the editor reads), so it is never routed, stepped, loaded, counted
+    // or edited here
     links = list.filter(function (m) { return m.kind === 'link' && m.url; });
-    list = list.filter(function (m) { return links.indexOf(m) < 0; }).map(asSource);
+    list = list.filter(function (m) { return !(m.kind === 'link' && m.url); });
+    siteList = list;
+    list = list.map(asSource);
     var gh = own ? own.here() : [], a = arrange(own ? own.withMine(list) : list);
     var rank = function (m) { return m.group ? gh.indexOf(m.group) + 1 : 0; }, first = function (m) { return m.mine && rank(m) >= 0 && !siteGroupOf(m.group); };
     maps = a.filter(first).sort(function (x, y) { return rank(x) - rank(y); })

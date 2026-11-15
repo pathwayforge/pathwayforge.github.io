@@ -167,7 +167,8 @@ closed/kegg-hover/; the list is the KEGG page's own, closed/kegg/index.json.
   // signing out forgets the token and the maps kept in this browser
   $('out').addEventListener('click', function () {
     try { localStorage.removeItem(KEY); } catch (e) {}
-    if ('caches' in window) caches.delete(CACHE).catch(function () {});
+    // the token is shared with the site's other closed pages: their kept files go too, as the viewer's Sign out does
+    if ('caches' in window) caches.keys().then(function (ks) { ks.forEach(function (k) { if (k.indexOf('closed-') === 0) caches.delete(k); }); }).catch(function () {});
     cacheP = null; reset();
     cred = null; $('p').value = ''; showSignin('');
   });
@@ -183,11 +184,14 @@ closed/kegg-hover/; the list is the KEGG page's own, closed/kegg/index.json.
       var asked = new URLSearchParams(location.search).get('map'), first = 'kegg-2026';
       try { if (localStorage.getItem('closed-kegg-hover-map') === 'kegg-2017') first = 'kegg-2017'; } catch (e) {}
       if (asked && files[asked + '.svg']) first = asked;
-      api('/contents/closed/kegg/index.json', true).then(function (t) { buildList(JSON.parse(t)); }).catch(function () { buildList(null); });
+      api('/contents/closed/kegg/index.json', true).then(function (t) { buildList(JSON.parse(t)); }).catch(function () { buildList(null); });   // not an array: the fallback
       show(first).then(function () {   // then the other map, quietly
         Object.keys(files).forEach(function (f) { if (/\.svg$/.test(f)) load(f.replace(/\.svg$/, '')).catch(function () {}); });
       });
-    }).catch(function (e) { showSignin(why(e)); });
+    }).catch(function (e) {
+      if (e.status === 401) { try { localStorage.removeItem(KEY); } catch (x) {} }   // a refused token is forgotten, as in the viewer
+      showSignin(why(e));
+    });
   }
 
   // the view is the SVG's own viewBox, so the browser draws the lines afresh at every zoom (sharp, never a scaled
@@ -220,17 +224,24 @@ closed/kegg-hover/; the list is the KEGG page's own, closed/kegg/index.json.
   try { shut = JSON.parse(localStorage.getItem(closedKey) || '{}') || {}; } catch (e) {}
   var entries = null;
   function buildList(index) {
-    if (index) entries = index;
-    var box = $('hv-list'), group = null;
+    if (Array.isArray(index)) entries = index;
+    var box = $('hv-list');
     box.innerHTML = '';
-    var all = entries || [{ topic: 'Current', group: 'Hover', kind: 'link', url: '?map=kegg-2026' },
-                          { topic: '2017, with classes', group: 'Hover', kind: 'link', url: '?map=kegg-2017' }];
-    // as the viewer: maps first, then the links, each in its group
-    all = all.filter(function (e) { return e.kind !== 'link'; }).concat(all.filter(function (e) { return e.kind === 'link'; }));
-    all.forEach(function (e) {
-      if (e.group && e.group !== group) {
-        group = e.group;
-        var g = document.createElement('button'), name = group;
+    // without the KEGG list (not read): this page's own pictures, by their file names
+    var all = entries || Object.keys(files).filter(function (f) { return /\.svg$/.test(f); }).map(function (f) {
+      var k = f.replace(/\.svg$/, ''); return { topic: k, group: 'Hover', kind: 'link', url: '/kegg/hover/?map=' + k };
+    });
+    // as the viewer: the maps, then the links, each part by its groups in the order first met, no group first
+    function parts(es) {
+      var gs = es.some(function (e) { return !e.group; }) ? [''] : [];
+      es.forEach(function (e) { if (e.group && gs.indexOf(e.group) < 0) gs.push(e.group); });
+      return gs.map(function (g) { return es.filter(function (e) { return (e.group || '') === g; }); });
+    }
+    var ms = all.filter(function (e) { return e.kind !== 'link'; }), ls = all.filter(function (e) { return e.kind === 'link'; });
+    parts(ms).concat(parts(ls)).forEach(function (es) {
+      var name = es[0].group;
+      if (name) {
+        var g = document.createElement('button');
         g.type = 'button'; g.className = 'hv-group' + (shut[name] ? ' hv-shut' : ''); g.textContent = name;
         g.addEventListener('click', function () {
           shut[name] = !shut[name];
@@ -239,17 +250,20 @@ closed/kegg-hover/; the list is the KEGG page's own, closed/kegg/index.json.
         });
         box.appendChild(g);
       }
-      var mine = e.kind === 'link' && /[?&]map=([\w-]+)/.exec(e.url || '');
-      if (e.group && shut[e.group] && !(mine && mine[1] === want)) return;   // the picture shown keeps its line
-      var a = document.createElement('a');
-      a.className = 'hv-item' + (e.group ? ' hv-sub' : '');
-      a.textContent = e.topic || e.title;
-      if (e.note) a.title = (e.topic || e.title) + ', ' + e.note;
-      if (mine) {
-        a.dataset.map = mine[1]; a.href = '?map=' + mine[1];
-        a.addEventListener('click', function (ev) { ev.preventDefault(); show(mine[1]); });
-      } else a.href = '{{ site.baseurl }}/kegg/#' + e.id;
-      box.appendChild(a);
+      es.forEach(function (e) {
+        // a picture of this page: a link to /kegg/hover/ with ?map=
+        var mine = e.kind === 'link' && /\/kegg\/hover\/\?map=([\w-]+)$/.exec(e.url || '');
+        if (name && shut[name] && !(mine && mine[1] === want)) return;   // the picture shown keeps its line
+        var a = document.createElement('a');
+        a.className = 'hv-item' + (name ? ' hv-sub' : '');
+        a.textContent = e.topic || e.title;
+        if (e.note) a.title = (e.topic || e.title) + ', ' + e.note;
+        if (mine) {
+          a.dataset.map = mine[1]; a.href = '?map=' + mine[1];
+          a.addEventListener('click', function (ev) { ev.preventDefault(); show(mine[1]); });
+        } else a.href = e.kind === 'link' ? e.url : '{{ site.baseurl }}/kegg/#' + e.id;
+        box.appendChild(a);
+      });
     });
     press(want);
   }
