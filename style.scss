@@ -449,3 +449,7 @@ div.img img{
 
 // Pathway Forge: the header holds only the collection's name (its right click switches collections)
 .site-name { font-size: 20px; cursor: default; }
+// The name always in one place, at the left, in line with the list's map names, on every collection and at every
+// width (user, 2026-11-15: "You can change the title, but don't change the place"); was centred with the page
+.wrapper-masthead .container { max-width: none; margin: 0; padding: 0 16px; }
+.masthead, .site-info { text-align: left; float: none; }
