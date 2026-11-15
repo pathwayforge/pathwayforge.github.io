@@ -1,0 +1,14 @@
+---
+layout: default
+title: Global metabolic map
+permalink: /kegg/
+icon: favicon-kegg
+icon_version: pl237
+collection: kegg
+---
+{% comment %}
+The closed page: KEGG's global metabolic map 01100 in three versions, in the viewer's closed mode. Its maps are not on
+this site: they are in the organisation's private data repository (closed/kegg/), read through GitHub's API after
+sign-in with the site's token (KEGG's maps are copyrighted). The page's own tab icon: images/favicon-kegg/.
+{% endcomment %}
+{% include atlas-app.html index="/kegg/index.json" search="/kegg/atlas-data/search.json" name="Global metabolic map" closed="kegg" %}

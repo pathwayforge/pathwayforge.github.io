@@ -1,0 +1,18 @@
+---
+layout: default
+title: Atlas of Inflammation Resolution
+permalink: /air/
+icon: favicon-air
+icon_version: pl328
+collection: air
+---
+{% comment %}
+A closed page: the Atlas of Inflammation Resolution (AIR, version 1.6, its 44 maps) in the viewer's closed mode, for
+study. Its maps are not on this site: they are in the organisation's private data repository (closed/air/), read through
+GitHub's API after sign-in with the site's token.
+{% endcomment %}
+<style>
+  /* the eicosanoid maps marked in the list, in the viewer's own blue; the chosen map keeps its fill */
+  .m2-item.m2-src-eicosanoids:not(.m2-on) { color: var(--m2-accent); }
+</style>
+{% include atlas-app.html index="/air/index.json" search="/air/atlas-data/search.json" name="Atlas of Inflammation Resolution" closed="air" %}

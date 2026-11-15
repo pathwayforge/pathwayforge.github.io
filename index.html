@@ -1,0 +1,12 @@
+---
+layout: null
+permalink: /
+---
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow"><title>{{ site.name }}</title>
+<script>
+  // the site's address opens the collection last opened in this browser, else the first
+  var paths = { {% for c in site.data.collections %}{{ c.id | jsonify }}: {{ c.path | jsonify }}{% unless forloop.last %}, {% endunless %}{% endfor %} }, last = null;
+  try { last = localStorage.getItem('forge-collection'); } catch (e) {}
+  location.replace('{{ site.baseurl }}' + (paths[last] || {{ site.data.collections[0].path | jsonify }}));
+</script></head><body></body></html>

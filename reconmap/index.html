@@ -1,0 +1,12 @@
+---
+layout: default
+title: ReconMap
+permalink: /reconmap/
+collection: reconmap
+---
+{% comment %}
+A closed page: the Virtual Metabolic Human's ReconMap maps (ReconMap 2, ReconMap3 and its six organelle maps), shown
+unchanged, in the viewer's closed mode. Its maps are not on this site: they are in the organisation's private data
+repository (closed/reconmap/), read through GitHub's API after sign-in with the site's token.
+{% endcomment %}
+{% include atlas-app.html index="/reconmap/index.json" search="/reconmap/atlas-data/search.json" name="ReconMap" closed="reconmap" %}

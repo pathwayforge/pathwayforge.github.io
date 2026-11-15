@@ -1,0 +1,18 @@
+# The collections, one per page; the switcher on the site's title lists them in this order. accent: the collection's
+# own colour (the viewer's accent and the line under the header), a first proposal to be chosen.
+- id: air
+  name: Atlas of Inflammation Resolution
+  path: /air/
+  accent: "#b0566b"
+- id: kegg
+  name: KEGG global metabolic map
+  path: /kegg/
+  accent: "#3f8a5a"
+- id: kegg-hover
+  name: KEGG global map, hover
+  path: /kegg/hover/
+  accent: "#3f8a5a"
+- id: reconmap
+  name: ReconMap
+  path: /reconmap/
+  accent: "#b07a2c"
