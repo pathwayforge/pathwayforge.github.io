@@ -4,7 +4,8 @@ google_analytics:
 url: https://pathwayforge.github.io
 baseurl: ""
 # the tab icon's board code, added to its links so browsers fetch a new icon at once
-icon_version: pl230
+icon: favicon-kegg
+icon_version: pl237
 defaults:
   # kept out of search engines (noindex in _includes/meta.html; robots.txt too)
   - scope:
