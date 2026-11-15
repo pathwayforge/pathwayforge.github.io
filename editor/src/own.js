@@ -81,35 +81,22 @@
     function mineValid(v, was) {
       return v === was || !((V.siteList || []).some(function (m) { return m.group === v; }) || mineGroups().indexOf(v) >= 0);
     }
-    // a group's name typed in place: Rename group, a double-click on its name, or a new group (Add group), its field
-    // where the group stands (a new one under the reader's last); Enter or a click elsewhere keeps the name, Esc leaves it;
-    // a new group left empty or with Esc is not made; a name already taken turns the field red and is not kept
-    function renameGroup(was) {
-      var box = document.getElementById('m2-list'), f = document.createElement('input'), done = false;
-      f.type = 'text'; f.className = 'm2-group-edit'; f.maxLength = 60; f.value = was || ''; f.placeholder = 'Name of the group';
-      f.setAttribute('aria-label', 'Name of the group');
-      if (was) {
-        var g = box.querySelector('.m2-group.m2-mine[data-group="' + CSS.escape(was) + '"]');
-        if (!g) return;
-        g.replaceWith(f);
-      } else {
-        var own = box.querySelectorAll('.m2-mine'), last = own[own.length - 1];
-        if (last) last.after(f); else box.insertBefore(f, box.firstChild);
-        f.scrollIntoView({ block: 'nearest' });
-      }
+    // a name typed in place in the list, one way for groups and maps (inPlace): the field where the line was (a new
+    // group's under the reader's last); Enter or a click elsewhere keeps it, Esc leaves it; o.bad(v) gives why a name is
+    // refused (the field red, kept open). The list is not built again while it is open (V.naming, the viewer's
+    // buildList), so a save or a folder scan meanwhile never drops what is being typed (the review, 2026-11-15)
+    var naming = null;
+    function inPlace(at, o) {
+      if (naming) naming(true);
+      var f = document.createElement('input'), done = false;
+      f.type = 'text'; f.className = o.cls; f.maxLength = o.max; f.value = o.value; f.placeholder = o.label;
+      f.setAttribute('aria-label', o.label);
+      if (at) at.replaceWith(f); else o.put(f);
+      f.scrollIntoView({ block: 'nearest' });
       f.focus(); f.select();
-      var end = function (keep) {
-        if (done) return; done = true;
-        var v = f.value.trim();
-        if (keep && v && v !== was && mineValid(v, was)) {
-          var gs = mineGroups();
-          if (was && gs.indexOf(was) >= 0) {
-            gs[gs.indexOf(was)] = v;
-            Object.keys(mine).forEach(function (k) { var r = mine[k]; if (r.group === was) { r.group = v; minePut(r).catch(function () {}); } });
-            if (V.closed[was]) { V.closed[v] = true; delete V.closed[was]; V.saveClosed(); }
-          } else if (!was) gs.push(v);
-          mineGroupsSet(gs);
-        }
+      var end = naming = function (keep) {
+        if (done) return; done = true; naming = null;
+        o.end(keep ? f.value.trim() : null);
         V.refreshMine();
       };
       f.addEventListener('input', function () { f.classList.remove('m2-bad'); f.title = ''; });
@@ -118,8 +105,8 @@
         if (e.key === 'Escape') return end(false);
         if (e.key !== 'Enter') return;
         e.preventDefault();
-        var v = f.value.trim();
-        if (v && !mineValid(v, was)) { f.classList.add('m2-bad'); f.title = 'A group of this name is in the list already'; return; }
+        var why = o.bad && o.bad(f.value.trim());
+        if (why) { f.classList.add('m2-bad'); f.title = why; return; }
         end(true);
       });
       f.addEventListener('blur', function () {
@@ -127,6 +114,25 @@
         if (pressed) document.addEventListener('click', function () { setTimeout(function () { end(true); }, 0); }, { once: true, capture: true });
         else end(true);   // a press elsewhere (a map) gets its click before the list is built again
       });
+    }
+    // a group's name: Rename group, a double-click on its name, or a new group (Add group), under the reader's last group;
+    // a new group left empty or with Esc is not made; a name already taken is refused
+    function renameGroup(was) {
+      var box = document.getElementById('m2-list'), at = null;
+      if (was && !(at = box.querySelector('.m2-group.m2-mine[data-group="' + CSS.escape(was) + '"]'))) return;
+      inPlace(at, { cls: 'm2-group-edit', max: 60, value: was || '', label: 'Name of the group',
+        put: function (f) { var own = box.querySelectorAll('.m2-mine'), last = own[own.length - 1]; if (last) last.after(f); else box.insertBefore(f, box.firstChild); },
+        bad: function (v) { return v && !mineValid(v, was) ? 'A group of this name is in the list already' : ''; },
+        end: function (v) {
+          if (!v || v === was || !mineValid(v, was)) return;
+          var gs = mineGroups();
+          if (was && gs.indexOf(was) >= 0) {
+            gs[gs.indexOf(was)] = v;
+            Object.keys(mine).forEach(function (k) { var r = mine[k]; if (r.group === was) { r.group = v; minePut(r).catch(function () {}); } });
+            if (V.closed[was]) { V.closed[v] = true; delete V.closed[was]; V.saveClosed(); }
+          } else if (!was) gs.push(v);
+          mineGroupsSet(gs);
+        } });
     }
     var pressed = false;
     document.addEventListener('pointerdown', function () { pressed = true; }, true);
@@ -148,10 +154,14 @@
       var t = e.target.closest('.m2-map, .m2-group, .m2-empty'), m = t && t.classList.contains('m2-map') ? V.byId[t.dataset.id] : null;
       var gh = !!(repo() && token()), tg = t && t.dataset.group;   // with a token a site group takes maps too
       var g = m ? (m.mine || gh ? m.group || '' : '') : tg && (ownGroup(tg) || gh) ? tg : '', onGroup = t && !m && ownGroup(g);
-      var items = [['Add map', function () { addTo = g; picker.click(); }], ['Add group', function () { renameGroup(null); }]];
+      var into = m ? m.group || '' : tg && (ownGroup(tg) || V.siteGroupOf(tg) || t.classList.contains('m2-empty')) ? tg : '';   // a new map: into the group clicked, whoever's it is
+      var items = [['New map', function () { newMap(into); }], ['Add map from file', function () { addTo = g; picker.click(); }], ['Add group', function () { renameGroup(null); }]];
       var editing = V.grid.classList.contains('m2-editing') && V.current && V.current.id === (m && m.id);
-      if (m && m.mine && !editing) items.push(null, ['Remove map', function () { mineHide(m.id); }]);   // as the map's menu: not while it is edited
-      else if (m && gh && !editing) items.push(null, ['Remove map', function () { siteHide(siteHidden().concat([m.id])); }]);
+      var mapItems = [];   // on a map: Rename map, Remove map (as the map's menu: not while it is edited), under one line
+      if (m && canRename(m, gh)) mapItems.push(['Rename map', function () { renameMap(m.id); }]);
+      if (m && m.mine && !editing) mapItems.push(['Remove map', function () { mineHide(m.id); }]);
+      else if (m && gh && !editing) mapItems.push(['Remove map', function () { siteHide(siteHidden().concat([m.id])); }]);
+      if (mapItems.length) items = items.concat([null], mapItems);
       if (onGroup) items.push(null, ['Rename group', function () { renameGroup(g); }], ['Remove group', function () { removeGroup(g); }]);
       if (siteHidden().length) items.push(null, ['Show removed maps', function () { siteHide([]); }]);
       listMenu(e.clientX, e.clientY, items);
@@ -194,9 +204,11 @@
         if (u) { letGo(u.svg); letGo(u.text); }
         u = mineURLs[r.id] = { at: r.at, svg: URL.createObjectURL(new Blob([r.svg], { type: 'image/svg+xml' })), text: URL.createObjectURL(new Blob([r.text], { type: 'application/xml' })) };
       }
-      var cdm = /<sbml[\s>]/.test(r.text.slice(0, 3000)) && r.text.indexOf('celldesigner') >= 0;
-      return { id: r.id, title: r.title, group: r.group && (groupsHere.indexOf(r.group) >= 0 || V.siteGroupOf(r.group)) ? r.group : '', topic: r.id, mine: true, file: r.file, width: r.width, height: r.height, v: String(r.at),
-        image: u.svg, legend: cdm ? 'celldesigner' : 'sbgn', downloads: [{ label: cdm ? 'CellDesigner' : 'GraphML', url: u.text }] };
+      var cdm = /<sbml[\s>]/.test(r.text.slice(0, 3000)) && r.text.indexOf('celldesigner') >= 0, sbm = !cdm && isSb(r.text);
+      var e = { id: r.id, title: r.title, group: r.group && (groupsHere.indexOf(r.group) >= 0 || V.siteGroupOf(r.group)) ? r.group : '', topic: r.id, mine: true, file: r.file, width: r.width, height: r.height, v: String(r.at),
+        image: u.svg, legend: cdm ? 'celldesigner' : 'sbgn', downloads: [{ label: cdm ? 'CellDesigner' : sbm ? 'SBGN-ML' : 'GraphML', url: u.text }] };
+      if (sbm) { e.editBase = emptyBase(); e.editPath = r.file; }   // made here (New map): edited as a site's SBGN-ML map, from the empty base (sbgn.js)
+      return e;
     }
     // with a token a map added goes to the site (toSite, core.js): until the site's build has it, it is shown from this
     // browser as a reader's map with `site` (its id there), dropped once the site lists that id (arrived: the old id to
@@ -213,6 +225,7 @@
         V.arrived[k] = r.site; delete mine[k]; delete mineURLs[k]; mineFlag();
         V.draftDo('readwrite', function (st) { return st.delete(k); }, 'mine').catch(function () {});
       });
+      list = siteNamed(list);
       var hid = siteHidden();
       if (hid.length) list = list.filter(function (m) { return hid.indexOf(m.id) < 0; });
       var own = mineShown().sort(function (a, b) { return a.title.localeCompare(b.title); }).map(mineEntry);
@@ -224,6 +237,80 @@
         V.refreshMine();
       });
     });
+    // New map (user, 2026-11-15: "create map right in place ... unnamed map ... then you can double click on it and change
+    // the name"): an empty SBGN-ML map of the reader's, Process Description, named Unnamed map (2, 3, ... while taken), in
+    // the group right-clicked or at the top, opened at once in the Edit window with the palette, nothing asked (user: "as in
+    // Google Docs ... you don't need to type name of the map ... you can do it on your own time"; a double-click names it).
+    // Kept as any map of theirs (this browser, their folder), also with a token: the site's build takes no SBGN-ML map of
+    // its own yet. Its map id (NEW_ID, sbgn.js) marks the file as made here (madeHere, sbgn.js), so the folder and Add map from file
+    // take it back; an SBGN-ML file of another editor is not taken (it may hold what the empty base cannot draw)
+    function newId() { return 'mine-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+    function newMap(group) {
+      var titles = mineShown().map(function (r) { return r.title; }).concat((V.siteList || []).map(function (m) { return m.topic || m.title; }));
+      var files = Object.keys(mine).map(function (k) { return mine[k].file; });
+      var title = 'Unnamed map', file;
+      for (var k = 2; titles.indexOf(title) >= 0 || files.indexOf(file = title.toLowerCase().replace(/ /g, '-') + '.sbgn') >= 0; k++) title = 'Unnamed map ' + k;
+      var text = '<?xml version="1.0" encoding="UTF-8"?>\n<sbgn xmlns="http://sbgn.org/libsbgn/0.3">\n  <map id="' + NEW_ID + '" language="process description">\n  </map>\n</sbgn>\n';
+      return mineIn.then(function () { return drawText(text); }).then(function (d) {
+        var r = { id: newId(), title: title, file: file, text: text, svg: d.svg, width: d.width, height: d.height, at: Date.now(), src: textHash(text), hidden: false, group: group || '' };
+        return minePut(r).then(function () {
+          toFolder(r.id, r.file, r.text);
+          V.refreshMine(); V.go(r.id);
+          var tries = 0;
+          (function edit() {   // the Edit tab shows once the editor has taken the map shown
+            var eb = document.querySelector('#m2-rail .m2-ri[data-win="edit"]');
+            if (eb && eb.offsetParent && V.current && V.current.id === r.id) { if (V.win !== 'edit') eb.click(); return; }
+            if (++tries < 100 && location.hash === '#' + r.id) setTimeout(edit, 50);   // not once another map is chosen
+          })();
+        });
+      }).catch(function (e) { alert('The new map was not made: ' + (e && e.message ? e.message : e)); });
+    }
+    // a map's name typed in place (user, 2026-11-15: "you should be able to double click and change the name of any map"):
+    // a double-click on it or Rename map in the list's menu; the reader's maps in their record (title), the site's with a
+    // token in their maps/<id>.md (topic, the name the list shows; the title too where it was the same), shown at once
+    // while the site's list still has the old name. Maps whose name the build takes from elsewhere (the SBGN-ML groups) are
+    // not renamed
+    var renamed = {};   // site map id -> { was, to }: the list's name before and the one given here
+    function canRename(m, gh) { return !!m && !m.shownAs && (m.mine ? !!mine[m.id] && !mine[m.id].site : !!gh && !/-sbgn(ml)?$|^external-/.test(m.id)); }
+    function siteNamed(list) {   // the names given here over the site's list (copies: the site's own entries untouched)
+      return list.map(function (m) {
+        var n = renamed[m.id];
+        if (!n) return m;
+        if (m.topic === n.to) { delete renamed[m.id]; return m; }   // the build has it
+        return m.topic === n.was ? Object.assign({}, m, { topic: n.to }) : m;
+      });
+    }
+    function renameMap(id) {
+      var m = V.byId[id], b = document.querySelector('#m2-list .m2-map[data-id="' + CSS.escape(id) + '"]');
+      if (!m || !b || !canRename(m, repo() && token())) return;
+      var shown = m.mine ? m.title : m.topic;
+      inPlace(b, { cls: 'm2-group-edit m2-map-edit' + (b.classList.contains('m2-sub') ? ' m2-sub' : ''), max: 120, value: shown, label: 'Name of the map',
+        end: function (v) {
+          if (!v || v === shown) return;
+          if (m.mine) { var r = mine[id]; r.title = v; minePut(r).catch(function () {}); }
+          else {
+            var was = renamed[id] ? renamed[id].was : shown;
+            renamed[id] = { was: was, to: v };
+            toSiteName(id, shown, v).catch(function (e) { delete renamed[id]; V.refreshMine(); alert(shown + ' was not renamed: ' + (e && e.message ? e.message : e)); });
+          }
+          if (m.mine && V.current && V.current.id === id) {   // the map on screen, and the editor's own name of it
+            document.getElementById('m2-title').textContent = v;
+            if (map && map.id === id) map.title = v;
+          }
+        } });
+    }
+    function toSiteName(id, was, v) {   // maps/<id>.md: its topic, and its title where it was the same; one commit
+      var path = '/contents/maps/' + encodeURIComponent(id) + '.md', q = JSON.stringify(v.replace(/["\\]/g, ''));   // the build reads the front matter's quotes plainly
+      return api(path + '?ref=main').then(function (r) { if (!r.ok) throw new Error(r.status === 404 ? 'its name does not come from a page of its own' : 'GitHub ' + r.status); return r.json(); })
+        .then(function (d) {
+          var md = new TextDecoder().decode(Uint8Array.from(atob(d.content.replace(/\n/g, '')), function (c) { return c.charCodeAt(0); }));
+          var line = function (k) { var x = md.match(new RegExp('^' + k + ': (.*)$', 'm')); return x ? x[1].replace(/^"(.*)"$/, '$1') : null; };
+          if (line('topic') === null) throw new Error('its page has no topic line');
+          if (line('title') === line('topic')) md = md.replace(/^title: .*$/m, 'title: ' + q);
+          md = md.replace(/^topic: .*$/m, 'topic: ' + q);
+          return api(path, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Map renamed in the viewer: ' + id, content: b64(md), sha: d.sha, branch: 'main' }) });
+        }).then(function (r) { if (!r.ok) throw new Error('GitHub ' + r.status); });
+    }
     function mineHide(id) {   // off the list, kept
       var r = mine[id]; if (!r) return;
       r.hidden = true; minePut(r).catch(function () {});
@@ -249,21 +336,22 @@
     function mineAdd(name, text, d, id, group) {   // group: the reader's group it was added into (undefined: where it was, else at the top)
       var h = textHash(text), old = id ? mine[id] : mineMatch(name, text, h);
       var back = !id && old && old.text !== text && old.src === h;   // the file as first added, the map since edited: the edits kept (a map of before, matched by name alone, takes the new file, as then)
-      var r = { id: old ? old.id : 'mine-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), title: old ? old.title : name.replace(/\.(graphml|xml)$/i, ''),
+      var r = { id: old ? old.id : newId(), title: old ? old.title : name.replace(/\.(graphml|xml|sbgn)$/i, ''),
         file: old ? old.file : name, text: back ? old.text : text, svg: back ? old.svg : d.svg, width: back ? old.width : d.width, height: back ? old.height : d.height,
         at: back ? old.at : Date.now(), src: old ? old.src || (id ? undefined : h) : h, hidden: false, group: group !== undefined ? group : old && old.group || '' };
       return minePut(r).then(function () { return r; });
     }
     function addFiles(list, group) {   // a reader's files, drawn and kept; group: Add map or a drop on a group of theirs
       list = Array.prototype.slice.call(list);   // the picker's list empties when it is reset
-      var picked = Array.prototype.filter.call(list, function (f) { return /\.(graphml|xml)$/i.test(f.name); }).slice(0, 1);   // one map at a time (user, 2026-11-13: no bulk additions for now)
+      var picked = Array.prototype.filter.call(list, function (f) { return /\.(graphml|xml|sbgn)$/i.test(f.name); }).slice(0, 1);   // one map at a time (user, 2026-11-13: no bulk additions for now)
       var last = null;
       return picked.reduce(function (p, f) {
         return p.then(function () { return f.text(); }).then(function (t) {
-          if (repo() && token()) return drawText(t).then(function (d) {   // with a token: to the site, shown from here until built
+          if (isSb(t) && !madeHere(t)) throw new Error('an SBGN-ML file from another editor cannot be added yet, only one made here with New map');
+          if (repo() && token() && !isSb(t)) return drawText(t).then(function (d) {   // with a token: to the site, shown from here until built (a map made here stays the reader's: the build takes no SBGN-ML map of its own yet)
             var ord = (V.siteList || []).reduce(function (a, m) { return (!group || m.group === group) ? Math.max(a, m.order || 0) : a; }, 0) + 1;
             return toSite(f.name, t, group, ord).then(function (s) {
-              var r = { id: 'mine-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), title: f.name.replace(/\.(graphml|xml)$/i, ''), file: f.name,
+              var r = { id: newId(), title: f.name.replace(/\.(graphml|xml)$/i, ''), file: f.name,
                 text: t, svg: d.svg, width: d.width, height: d.height, at: Date.now(), hidden: false, group: group || '', site: s.id };
               return minePut(r).then(function () { last = r.id; });
             });
@@ -273,7 +361,7 @@
       }, Promise.resolve()).then(function () { V.refreshMine(); if (last) V.go(last); });
     }
     var picker = document.createElement('input');
-    picker.type = 'file'; picker.multiple = false; picker.accept = '.graphml,.xml'; picker.hidden = true;
+    picker.type = 'file'; picker.multiple = false; picker.accept = '.graphml,.xml,.sbgn'; picker.hidden = true;
     picker.addEventListener('change', function () { addFiles(picker.files, addTo); picker.value = ''; });
     document.body.appendChild(picker);
     document.addEventListener('dragover', function (e) { if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') >= 0) e.preventDefault(); });
@@ -287,6 +375,6 @@
     var own = {
       read: function () { return mineIn; },
       here: function () { return (groupsHere = mineGroupsHere()); }, groups: function () { return groupsHere; },
-      withMine: withMine, isGroup: ownGroup, rename: renameGroup, shown: mineShown, examplesHidden: examplesHidden,
-      rec: function (id) { return mine[id] || null; }
+      withMine: withMine, isGroup: ownGroup, rename: renameGroup, renameMap: renameMap, canRename: canRename, newMap: newMap, shown: mineShown, examplesHidden: examplesHidden,
+      rec: function (id) { return mine[id] || null; }, naming: function () { return !!naming; }
     };

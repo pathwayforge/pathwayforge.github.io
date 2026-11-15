@@ -317,10 +317,34 @@ page, so its styles keep the base they were made on). The looks before (Default 
   #m2-editwin .m2-ed-palette button[aria-pressed="true"], #m2-editwin .m2-ed-palette button[aria-pressed="true"]:hover { background: #f1f3f4; color: #70757a; }
   #m2-editwin .m2-ed-palette button.m2-ed-sticky, #m2-editwin .m2-ed-palette button.m2-ed-sticky:hover { border-color: #70757a; }
   #m2-editwin .m2-ed-palette svg { width: 21px; height: 21px; stroke-width: 1.6; }
+  /* Sign weights (user, 2026-11-15: "keep with style ... universal"), for every sign in the Edit window, palette and tools,
+     present and future: outlines 1.6; a mark inside a sign (class "in": the omitted process's //, the uncertain one's ?,
+     the equivalence bars) 1.3 with round ends; a dot (class "dot") a filled circle, never a stub of line; letters (AND,
+     OR, NOT) Arial, filled and stroked .28, so they read at the marks' weight. Weights set here only, never on a sign */
+  #m2-editwin svg .in { stroke-width: 1.3; stroke-linecap: round; }
+  #m2-editwin svg .dot { fill: currentColor; stroke: none; }
+  #m2-editwin svg text { font-family: Arial, sans-serif; fill: currentColor; stroke: currentColor; stroke-width: .28; }
   /* the circled i beside Connecting arcs (user, 2026-11-14: "some kind of info glyph, small circle with I"): a sign button
-     in the heading's grey, opening How to edit at its section; the sign buttons' one hover */
-  #m2-editwin .m2-ed-palette button.m2-ed-pinfo { display: inline-flex; vertical-align: -3px; width: 16px; height: 16px; margin-left: 2px; border: 0; border-radius: 50%; color: var(--m2-text-soft); cursor: pointer; }
-  #m2-editwin .m2-ed-palette button.m2-ed-pinfo svg { width: 14px; height: 14px; stroke-width: 1.3; }
+     opening How to edit at its section; the sign buttons' one hover. Smaller and lighter (user, 2026-11-15: "more elegant
+     ... smaller ... a thinner edge"): a 12 px sign, thin ring, the sign buttons' grey, in a 16 px hit area */
+  /* the palette's tabs PD and AF and AF's look (user, 2026-11-15): text buttons, as the Settings' choices (the chosen one in
+     the accent), never the sign buttons' grey square */
+  /* the notation, PD or AF, and with AF its look: sign buttons in the palette's grid, pressed as the tools are (user,
+     2026-11-15: "like icons. You press and they stay pressed"; CLAUDE.md, A quiet Edit window) */
+  #m2-editwin .m2-ed-pnot { align-items: center; margin: 0 0 6px; }
+  /* AF's two views (user, 2026-11-15: the look icons beside PD and AF were taken for glyphs to drag): two rows of round
+     choices under the tabs, the palette's small grey text, the chosen circle filled in the sign grey; no accent */
+  #m2-editwin .m2-ed-plook { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; margin: 0 0 8px 4px; }
+  #m2-editwin .m2-ed-plook[hidden] { display: none; }
+  #m2-editwin .m2-ed-phyb { display: flex; align-items: center; gap: 6px; margin: 0 0 8px 6px; font-size: 12px; color: var(--m2-text-soft); cursor: pointer; }
+  #m2-editwin .m2-ed-phyb[hidden] { display: none; }
+  #m2-editwin .m2-ed-phyb input { margin: 0; width: 12px; height: 12px; accent-color: #70757a; cursor: pointer; }
+  #m2-editwin .m2-ed-palette .m2-ed-plook button { width: auto; height: 22px; gap: 7px; padding: 0 6px 0 2px; font: inherit; font-size: 12px; white-space: nowrap; color: var(--m2-text-soft); cursor: pointer; }
+  #m2-editwin .m2-ed-palette .m2-ed-plook button:hover { background: #f1f3f4; }
+  #m2-editwin .m2-ed-radio { flex: none; box-sizing: border-box; width: 12px; height: 12px; border: 1.3px solid #80868b; border-radius: 50%; }
+  #m2-editwin .m2-ed-plook button[aria-checked="true"] .m2-ed-radio { border-color: #70757a; background: radial-gradient(circle, #70757a 0 2.5px, transparent 3px); }
+  #m2-editwin .m2-ed-palette button.m2-ed-pinfo { display: inline-flex; vertical-align: -3px; width: 16px; height: 16px; margin-left: 1px; border: 0; border-radius: 50%; color: #80868b; cursor: pointer; }
+  #m2-editwin .m2-ed-palette button.m2-ed-pinfo svg { width: 12px; height: 12px; }
   /* Properties (user, 2026-11-14: "the graph editor way ... compact"): yEd's two columns under the palette, the names on
      the left in the palette's grey, small plain fields with a light edge on the right; a colour as its swatch (the picker)
      beside its hex; Size step last, the step of a resize by the handles */
@@ -452,6 +476,8 @@ page, so its styles keep the base they were made on). The looks before (Default 
   #m2-setwin .m2-set-ticks { display: flex; justify-content: space-between; padding: 0 7px; margin: 1px 0 14px; }
   #m2-setwin .m2-set-side { margin-bottom: 14px; }
   .m2-group-edit.m2-bad { border-color: #c5221f; }
+  .m2-group-edit.m2-map-edit { margin-top: 0; }   /* a map's name in place, where its line was (own.js renameMap) */
+  .m2-map-edit.m2-sub { margin-left: 14px; width: calc(100% - 14px); }
   .m2-group-edit { display: block; width: 100%; box-sizing: border-box; font: inherit; font-size: 14px; color: var(--m2-text); padding: 1px 4px; margin-top: 6px;
     border: 1px solid var(--m2-accent); border-radius: var(--m2-radius); background: var(--m2-bg); }   /* a reader's group being renamed in place */
   #m2-setwin .m2-set-ticks i { width: 1px; height: 4px; background: var(--m2-muted); }
@@ -469,6 +495,7 @@ page, so its styles keep the base they were made on). The looks before (Default 
   /* the chosen map: a filled box in the site's link blue, white text */
   /* under the pointer: --m2-hover (none since 2026-11-09; was a very light grey) */
   .m2-item:hover { background: var(--m2-hover); }
+  a.m2-link { text-decoration: none; }   /* a link entry (another page), drawn as a map's entry */
   .m2-item.m2-on { background: var(--m2-accent); color: var(--m2-on-accent); }
   .m2-item:focus { outline: none; }
   .m2-none { font-size: 12px; color: var(--m2-muted); padding: 2px 4px; }
@@ -890,7 +917,7 @@ page, so its styles keep the base they were made on). The looks before (Default 
   function isMapPicture(url) { return (/\.svg\?/.test(url) && url.indexOf('/images/') < 0) || /^blob:/.test(url); }
   // current: the map on screen; chosen: the map last asked for (the list, the arrow keys, the address), which
   // becomes current once its files are loaded. The list marks chosen, so a click or an arrow key shows at once
-  var maps = [], byId = {}, topics = [], current = null, chosen = null;
+  var maps = [], links = [], byId = {}, topics = [], current = null, chosen = null;
   // the source a map is drawn from (Settings, Source; user, 2026-11-13: SBGN-ML in the viewer, "the GraphML based way"):
   // 'file', the map's own file (the default), or 'sbgn', its SBGN-ML file as the build drew it (an entry's sbgn: the
   // file read by the converter, drawn by yrender, its click data). A map with no SBGN-ML stays as it is. The S key flips.
@@ -2370,6 +2397,8 @@ page, so its styles keep the base they were made on). The looks before (Default 
     else go(e.m);
   }
   function buildList(filter) {
+    if (own && own.naming()) return;   // a name being typed in the list (own.js inPlace): built again when it is kept or left
+    var ghNow = !!editor && editor.hasToken();   // with a token the site's maps are renamed too (own.canRename)
     var box = document.getElementById('m2-list');
     var keep = box.scrollTop;
     box.innerHTML = '';
@@ -2389,7 +2418,7 @@ page, so its styles keep the base they were made on). The looks before (Default 
       g.addEventListener('click', function () {
         // a double-click on the reader's group: the list is built again after each click, so the second click lands on a
         // new heading; it undoes the first's open or close and renames
-        var dbl = mg && Date.now() - mineClickAt < 400; mineClickAt = dbl ? 0 : Date.now();
+        var dbl = mg && twice('g:' + name);
         closed[name] = !closed[name];
         saveClosed();
         buildList(document.getElementById('m2-search').value);
@@ -2445,12 +2474,28 @@ page, so its styles keep the base they were made on). The looks before (Default 
       var tag = TAG_ICONS[m.tag];
       if (tag) { b.insertAdjacentHTML('beforeend', tag[0]); tips.push(tag[1]); }
       if (m.imageError) { b.insertAdjacentHTML('beforeend', ERROR_ICON); tips.push('Images not made from the current GraphML'); }
+      var named = !!own && own.canRename(m, ghNow);   // a map whose name can be changed here (own.js): a double-click on it
+      if (named) tips.push('Double-click to rename');
       b.title = tips.join(', ');
-      b.addEventListener('click', function () { go(m.id); });
+      b.addEventListener('click', function () {
+        // as a group's double-click (heading): the list is built again after the first click, so the second lands on a new button
+        if (twice('m:' + m.id) && named) return own.renameMap(m.id);
+        go(m.id);
+      });
       box.appendChild(b);
     });
     if (!ownDone) ownEmpty();
     emptyGroups();
+    // the links after the maps, in their groups (a group folds as any other); a search matches their names
+    var lg = null;
+    links.filter(function (l) { return !q || matchMap(q, l); }).forEach(function (l) {
+      if (l.group && l.group !== lg) { lg = l.group; heading(lg, !q && closed[lg]); }
+      if (l.group && !q && closed[l.group]) return;
+      var a = el('a', 'm2-item m2-link' + (l.group ? ' m2-sub' : ''));
+      a.appendChild(el('span', 'm2-name', label(l)));
+      a.href = l.url; a.title = label(l) + (l.note ? ', ' + l.note : '');
+      box.appendChild(a);
+    });
     mols.forEach(function (g) {
       var t = el('div', 'm2-mol', g.label);
       if (g.name !== g.label) t.appendChild(el('span', 'm2-why', ' ' + g.name));
@@ -2611,7 +2656,10 @@ page, so its styles keep the base they were made on). The looks before (Default 
   var siteList = null;
   function setMaps(list) {
     siteList = list;
-    list = list.map(asSource);
+    // a link (kind "link", url; user 2026-11-15, the KEGG hover pictures): a list entry that opens another page, kept
+    // apart from the maps, so it is never routed, stepped, loaded, counted or edited here
+    links = list.filter(function (m) { return m.kind === 'link' && m.url; });
+    list = list.filter(function (m) { return links.indexOf(m) < 0; }).map(asSource);
     var gh = own ? own.here() : [], a = arrange(own ? own.withMine(list) : list);
     var rank = function (m) { return m.group ? gh.indexOf(m.group) + 1 : 0; }, first = function (m) { return m.mine && rank(m) >= 0 && !siteGroupOf(m.group); };
     maps = a.filter(first).sort(function (x, y) { return rank(x) - rank(y); })
@@ -2839,9 +2887,8 @@ page, so its styles keep the base they were made on). The looks before (Default 
       var bend = ed && !unbend && window.m2EditAddBend && window.m2EditAddBend();   // a line under the pointer
       var turn = ed && window.m2EditTurn && window.m2EditTurn();   // a process or logic gate under the pointer: turned a quarter
       var main = ed && window.m2EditMain && window.m2EditMain();   // an added reactant's or product's line of a CellDesigner reaction
-      var gate = turn && /gate/.test(turn.label);   // a logic gate's Turn: not the items of a glyph under it (the review)
-      var mac = ed && !unbend && !gate && window.m2EditNodeItems && window.m2EditNodeItems();   // also under Turn process; a process (its other kinds), a macromolecule (Add state variable, Add unit of information, Make multimer or Make macromolecule) or a nucleic acid feature (Add unit of information, with ct:mRNA, with ct:gene) under the pointer (Full, SBGN-ML)
-      var del = ed && !unbend && !gate && window.m2EditDelete && window.m2EditDelete();   // a state variable, unit of information, glyph the palette makes or empty compartment under the pointer (Full, SBGN-ML)
+      var mac = ed && !unbend && window.m2EditNodeItems && window.m2EditNodeItems();   // also under Turn process; a process (its other kinds), a macromolecule (Add state variable, Add unit of information, Make multimer or Make macromolecule) or a nucleic acid feature (Add unit of information, with ct:mRNA, with ct:gene) under the pointer (Full, SBGN-ML)
+      var del = ed && !unbend && window.m2EditDelete && window.m2EditDelete();   // a state variable, unit of information, glyph the palette makes or empty compartment under the pointer (Full, SBGN-ML)
       // every bend point of the map, on empty map space only (user, 2026-11-14: a right click on a bend point means that
       // bend point)
       var unbendAll = ed && window.m2EditAllBends && window.m2EditAllBends();
@@ -2864,6 +2911,7 @@ page, so its styles keep the base they were made on). The looks before (Default 
       var key = '<span class="m2-cx-key">' + (/mac|iphone|ipad|ipod/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent) ? '\u2318E' : 'Ctrl+E') + '</span>';
       if (ed) item(box, 'Switch to viewer', function () { tab('list'); }, key);   // leaving the Edit window ends editing
       else if (eb && eb.offsetParent) item(box, 'Switch to edit', function () { tab('edit'); }, key);
+      if (own) item(box, 'New map', function () { own.newMap(m && m.group || ''); });   // the editor's (own.js), into this map's group
       // no Remove map here: it is in the list's right-click menu only (user, 2026-11-14)
       if (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen)
         item(box, isPageFull() ? 'Exit full screen' : 'Full screen with tools', pageFull);
@@ -3054,7 +3102,10 @@ page, so its styles keep the base they were made on). The looks before (Default 
     });
     // The reader's own maps (user, 2026-11-13, the third layer): kept, listed and managed by the editor (editor/src/own.js),
     // only where the Edit tab is; the viewer asks it (own) for the list's entries and their groups once it is loaded
-    var own = null, mineClickAt = 0;
+    var own = null, lastClick = { key: null, at: 0 };
+    // a double-click in the list (a group or a map of the reader's renamed): the list is built again after each click, so
+    // the second click lands on a new button; the same thing clicked twice within 400 ms, one record for both
+    function twice(key) { var t = Date.now(), d = lastClick.key === key && t - lastClick.at < 400; lastClick = d ? { key: null, at: 0 } : { key: key, at: t }; return d; }
     // with a token a map added goes to the site: once the site lists it, the reader's record of it gives way (own.js),
     // its old id to the site's here, so the map shown and its address follow
     var arrived = {};

@@ -190,7 +190,7 @@
               if (V.kept && V.kept.id === target.id) V.kept.sha = target.sha;
               var sm = V.byId[target.id];
               if (sm) target.v = V.ver(sm);   // the site's version still without this move
-              var ks = lastFor && lastFor[2] === target.id ? lastSvg : null;   // this map's drawing only, never the map edited before (the review, 2026-11-14)
+              var ks = lastFor && lastFor[2] === target.id && !lastFor[3] ? lastSvg : null;   // this map's drawing only, never the map edited before (the review, 2026-11-14)
               if (ks && site === target && src() === body) {
                 var all = V.stored();
                 var one = {}; one[target.id] = all[target.id] = { v: target.v, sha: target.sha, svg: ks, text: body, file: name, width: map.width, height: map.height, x0: picX0(), y0: picY0(), at: Date.now(), ref: siteRef, cur: nowRef() };
@@ -239,7 +239,7 @@
       var t = src(), at = { width: map.width, height: map.height, x0: picX0(), y0: picY0(), ref: siteRef, cur: nowRef() };
       // this map's drawing only: the map edited before still drawn while this one's first redraw runs (another map opened
       // at once) is never stored with it; then this text is drawn for it here (the review, 2026-11-14)
-      var own = lastFor && lastFor[2] === s.id ? lastSvg : null;
+      var own = lastFor && lastFor[2] === s.id && !lastFor[3] ? lastSvg : null;
       var pic = function () { return own ? Promise.resolve({ svg: own, width: at.width, height: at.height }) : drawText(t); };
       var fail = function (e) { if (site === s) warn('Not kept in this browser: ' + String(e && e.message ? e.message : e).replace(/\.$/, '') + '. Download the map to keep your changes.'); };
       if (s.mine) {   // a reader's own map: the map itself changed, in this browser and its folder (no draft)
@@ -334,7 +334,7 @@
         })
         .catch(lost);
     }
-    // the folder as the list (My maps): the GraphML and CellDesigner files a reader put there are added, one changed
+    // the folder as the list (My maps): the GraphML and CellDesigner files a reader put there, and SBGN-ML ones made here (New map), are added, one changed
     // since by another program (yEd, CellDesigner) is read again; the files written here for the site's maps are left
     // out, a map taken off the list stays off
     function syncFolder() {
@@ -352,7 +352,7 @@
           Object.keys(f.files).forEach(function (id) { ours[f.files[id].name] = id; });
           V.maps.forEach(function (m) { if (!m.mine) siteFiles[(graphmlOf(m.site || m) || '').split('?')[0].split('/').pop()] = 1; });   // the site's maps' files (a draft kept here)
           return all(f.dir).then(function (hs) {
-            return hs.filter(function (h) { return h.kind === 'file' && /\.(graphml|xml)$/i.test(h.name); }).reduce(function (q, h) {
+            return hs.filter(function (h) { return h.kind === 'file' && /\.(graphml|xml|sbgn)$/i.test(h.name); }).reduce(function (q, h) {
               return q.then(function () {
                 var id = ours[h.name];
                 if (id ? !mine[id] : siteFiles[h.name.replace(/-\d+(\.[^.]+)$/, '$1')]) return;   // a site's map kept here
@@ -365,6 +365,7 @@
                     // content, user 2026-11-14), so their original beside the copy written here, or a map taken off the
                     // list, is left as it is
                     if (!id && mineMatch(h.name, t)) return;
+                    if (isSb(t) && !madeHere(t)) return;   // another editor's SBGN-ML: not drawn from the empty base (sbgn.js)
                     return drawText(t).then(function (d) { return mineAdd(h.name, t, d, id || null); }).then(function (n) {
                       news = true;
                       return folderFile(n.id, { name: h.name, mod: fl.lastModified, size: fl.size });
@@ -378,11 +379,11 @@
       }).then(function () { if (news) V.refreshMine(); }, function () {});
     }
     // a reader's own map drawn for the list (My maps): as the build draws, with the role classes
-    function drawText(t) {
-      var c = isCd(t);
-      if (!c && !/<graphml[\s>]/.test(t.slice(0, 3000))) return Promise.reject(new Error('not a GraphML or CellDesigner file'));
-      return (c ? cdpy() : yr()).then(function () {
-        var svg = c ? window.cdrender.render(t, { classes: true }) : window.yrender.render(t, { classes: true }).svg;
+    function drawText(t) {   // a reader's map: GraphML, CellDesigner, or SBGN-ML made here (New map), drawn from the empty base (own.js)
+      var c = isCd(t), s = !c && isSb(t);
+      if (!c && !s && !/<graphml[\s>]/.test(t.slice(0, 3000))) return Promise.reject(new Error('not a GraphML, CellDesigner or SBGN-ML file'));
+      return (c ? cdpy() : s ? sbpy() : yr()).then(function () {
+        var svg = c ? window.cdrender.render(t, { classes: true }) : window.yrender.render(s ? sbGraphml(t, EMPTY_BASE) : t, { classes: true }).svg;
         var w = svg.match(/ width="([\d.]+)" height="([\d.]+)"/);
         if (!w) throw new Error('not a map this viewer can draw');
         return { svg: svg, width: parseFloat(w[1]), height: parseFloat(w[2]) };
@@ -450,7 +451,7 @@
       lay.catch(function (e) { lay = null; warn('The layout tools did not load: ' + e); });
       return lay;
     }
-    function tool(what, ids, done) {
+    function layTool(what, ids, done) {   // not tool: create.js's palette sign in hand, of the same scope, replaced it (Snap map to grid and Pack failed)
       if (!on || V.current !== map || !text) return;
       quiet();
       layout().then(function (L) {
@@ -461,9 +462,9 @@
         render(); paint(); changed();
       }).catch(function (e) { warn('Not done: ' + (e && e.message ? e.message.split('\n').slice(-2).join(' ') : e)); });
     }
-    function snapMap() { tool('grid', [], ['The map is on the grid already.', 'The map is on the grid. Ctrl or Cmd with Z takes it back.']); }
+    function snapMap() { layTool('grid', [], ['The map is on the grid already.', 'The map is on the grid. Ctrl or Cmd with Z takes it back.']); }
     function pack(ids) {
-      tool('pack', ids, [ids.length ? 'Packed already.' : 'Every complex is packed already.',
+      layTool('pack', ids, [ids.length ? 'Packed already.' : 'Every complex is packed already.',
         (ids.length ? 'Packed.' : 'Every complex packed.') + ' Ctrl or Cmd with Z takes it back.', 'Select a complex, or nothing for every complex.']);
     }
     box.querySelector('#m2-ed-tidy-grid').addEventListener('click', snapMap);
@@ -838,12 +839,12 @@
           // shift was taken for a new frame of the drawing and the map jumped right and down, out of sight on some maps)
           var sh = !drag && noNegative();
           if (sh) { parse(); x0 += sh[0]; y0 += sh[1]; }
-          r = drawMemo && !drawMemo.cd && drawMemo.text === text ? drawMemo.r : drawGraphml(text);
+          r = drawMemo && !drawMemo.cd && drawMemo.text === text && !afSbgn ? drawMemo.r : drawGraphml(text);   // the read-ahead drawing is never in the SBGN AF view
         }
         if (t !== ticket) return;
         drawing = false;
         if (r[1].length) warn('Drawn with warnings: ' + r[1].join('; '));
-        var svg = r[0]; lastSvg = svg; lastFor = [text, cd ? cd.now : null, site && site.id];
+        var svg = r[0]; lastSvg = svg; lastFor = [text, cd ? cd.now : null, site && site.id, afSbgn];   // [3]: drawn in the SBGN AF view, never kept, saved or downloaded (graphml.js)
         if (!on && site && V.kept && V.kept.id === site.id && V.kept.text != null) { V.kept.text = src(); V.kept.svg = svg; }   // left before this redraw ended: the kept file and drawing as drawn
         var m = svg.match(/<g transform="translate\(([-\d.]+),([-\d.]+)\)">/);
         var w = svg.match(/ width="([\d.]+)" height="([\d.]+)"/);
@@ -917,8 +918,14 @@
       if (typing) typing.done(true);   // a name being typed kept on its own map first (create.js)
       if (!on) return;
       if (saveTimer) push();   // a move still waiting is saved now
+      var kpic = V.img;
+      if (afSbgn && !cd) {   // the SBGN AF view stays in the editor: the map left drawn plainly, for the viewer and what is kept
+        afSbgn = false;
+        var pl = drawGraphml(text); lastSvg = pl[0]; lastFor = [text, null, site && site.id, false];
+        kpic = new Promise(function (res) { var im = new Image(); im.onload = function () { res(im); }; im.onerror = function () { res(V.img); }; im.src = URL.createObjectURL(new Blob([V.recolour(pl[0])], { type: 'image/svg+xml' })); });
+      }
       if (site && site.id && undo.length)   // not atSite(): a CellDesigner map's text follows a move only once drawn
-        V.kept = { id: site.id, v: site.v, sha: site.sha, pic: V.img, width: map.width, height: map.height, x0: picX0(), y0: picY0(), text: src(), svg: nowSvg(), file: name, ref: siteRef, cur: nowRef(), draft: !!site.pending && !site.mine, mine: !!site.mine };
+        V.kept = { id: site.id, v: site.v, sha: site.sha, pic: kpic, width: map.width, height: map.height, x0: picX0(), y0: picY0(), text: src(), svg: nowSvg(), file: name, ref: siteRef, cur: nowRef(), draft: !!site.pending && !site.mine, mine: !!site.mine };
       if (helpBox) help(false);
       on = false; drag = null; band = null; V.grid.classList.remove('m2-editing'); paint(); buttons();
       if (site && site.mine && !localTimer) V.refreshMine();   // its last version saved already: the list takes it (else local() does)
@@ -947,7 +954,7 @@
       // the drawing on screen kept with it, only when it is the drawing of the text the next editing starts from: every
       // move in the text drawn, none moving; made ahead now, or once the save under way has written that very text
       var S = src(), g = text, d0 = doc, el = V.img, svg = lastSvg;
-      if (!(svg && !drawing && !mv && !keyed && !liveC && docText === g && lastFor && lastFor[0] === g && lastFor[1] === (cd ? S : null))) return true;
+      if (!(svg && !drawing && !mv && !keyed && !liveC && docText === g && lastFor && !lastFor[3] && lastFor[0] === g && lastFor[1] === (cd ? S : null))) return true;
       var isCd = !!cd, isSbm = !!sb, make = function () {
         var dm = isCd ? { cd: true, base: S, text: g, q: [svg, S, g] } : { cd: false, text: g, r: [svg, []] };
         if (isCd) cdRemember(S, g);
@@ -1398,8 +1405,11 @@
       return rr(x, y, w, h, 0);
     }
     function shapeD(i, still) {   // the outline of node i, a multimer's second outline with it (still: without the drag)
-      var b = liveC && liveC[i] ? liveC[i] : still ? boxOf(i) : bx(i), n = nodes2[i], d = outlineD(n.shape, b[0], b[1], b[2], b[3]);
-      if (n.shape.props.mcount === '2') d = outlineD(n.shape, b[0] + 6, b[1] + 6, b[2], b[3]) + d;
+      var b = liveC && liveC[i] ? liveC[i] : still ? boxOf(i) : bx(i), n = nodes2[i];
+      // the SBGN AF view draws an activity as a sharp rectangle: its selection and highlights take that shape (user,
+      // 2026-11-15: the grey under a selected activity kept the protein's rounded corners)
+      var act = afSbgn && AF_KINDS.test(n.shape.kind), sh = act ? { kind: 'Macromolecule', props: { radius: '0' } } : n.shape, d = outlineD(sh, b[0], b[1], b[2], b[3]);
+      if (!act && n.shape.props.mcount === '2') d = outlineD(n.shape, b[0] + 6, b[1] + 6, b[2], b[3]) + d;
       return d;
     }
     function cut(port, outer, b) {   // where the arc from outer to its port inside the box b meets the box's edge
@@ -1888,7 +1898,17 @@
           var ox = (cd ? x0 : 0) + kx, oy = (cd ? y0 : 0) + ky;
           if (ox || oy) el.setAttribute('transform', 'translate(' + f1(-ox) + ',' + f1(-oy) + ')');
           var first = g.firstElementChild && g.firstElementChild.localName === 'a' ? g.firstElementChild : g;
-          var shapes = first.querySelectorAll(cd ? ':scope > path, :scope > rect, :scope > ellipse, :scope > polygon' : ':scope > path'), last = shapes.length ? shapes[shapes.length - 1] : null;
+          // after the node's own shapes, under its state variables and units of information (user, 2026-11-15: the grey
+          // was over them): a shape crossing the box's edge and not covering its centre is one of those, whichever
+          // renderer drew it (the shapes are in the file's places: the node's box shifted as the fill)
+          var shapes = Array.prototype.slice.call(first.querySelectorAll(cd ? ':scope > path, :scope > rect, :scope > ellipse, :scope > circle, :scope > polygon' : ':scope > path'));
+          var bL = b[0] - ox, bT = b[1] - oy, bR = bL + b[2], bB = bT + b[3], cX = bL + b[2] / 2, cY = bT + b[3] / 2;
+          var aux = function (s) {
+            var q; try { q = s.getBBox(); } catch (e) { return false; }
+            var inside = q.x >= bL - 0.5 && q.y >= bT - 0.5 && q.x + q.width <= bR + 0.5 && q.y + q.height <= bB + 0.5;
+            return !inside && !(q.x <= cX && cX <= q.x + q.width && q.y <= cY && cY <= q.y + q.height);
+          };
+          var own = shapes.filter(function (s) { return !aux(s); }), last = own.length ? own[own.length - 1] : null;
           if (last) last.after(el); else first.prepend(el);
         } else if (n.kids.length) {   // no drawing of the editor's yet: handles only for a group
         } else out.push(frame + '<path class="m2-ed-dark" d="' + shapeD(i) + '"/></g>');
@@ -1936,6 +1956,7 @@
       var dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy, t = L ? Math.max(0, Math.min(1, ((P[0] - a[0]) * dx + (P[1] - a[1]) * dy) / L)) : 0;
       return Math.hypot(P[0] - a[0] - dx * t, P[1] - a[1] - dy * t);
     }
+    function inComplex(i) { for (var u = nodes2[i].up; u != null; u = nodes2[u].up) if (nodes2[u].shape.kind === 'Complex') return true; return false; }
     function hit(P) {   // a bend point first, then a node, then an arc, then a group (its contents and arcs come first)
       var R = 6 / V.z, best = null, group = null;
       // among bend points close together the one selected wins, then one of the arc selected (user, 2026-11-12: select
@@ -1958,7 +1979,8 @@
         // the link"): a click on it is a click on its reaction's main line, no node handles; a drag on it moves the map
         var gm = cd && n.id.match(/^(.*)\|proc$/);
         if (gm) { var ga = edges2.findIndex(function (q) { return q.id === gm[1] + '|a'; }); if (ga >= 0 && !best) best = { e: ga, glyph: true, area: 0 }; return; }
-        if (n.kids.length) { if (!group || h.area < group.area) group = h; }
+        if (afSbgn && inComplex(i)) return;   // the SBGN AF view: a complex's members not drawn, the complex taken whole
+        if (n.kids.length && !(afSbgn && n.shape.kind === 'Complex')) { if (!group || h.area < group.area) group = h; }
         else if (!best || h.area < best.area) best = h;
       });
       if (best) return best;
@@ -2148,9 +2170,9 @@
     }
     var rclick = null;   // where the last right click was, for the menu's Remove bend point
     // the drawing of the file as it is now, when the renderer has drawn it (not before the first move: the picture is then still the one editing started on)
-    function nowSvg() { return lastFor && lastFor[0] === text && lastFor[1] === (cd ? cd.now : null) ? lastSvg : null; }
+    function nowSvg() { return lastFor && !lastFor[3] && lastFor[0] === text && lastFor[1] === (cd ? cd.now : null) ? lastSvg : null; }
     // while a redraw runs, the last drawing of this map (one move behind for a moment) in place of the site's picture
-    function shownSvg() { return nowSvg() || (lastFor && site && lastFor[2] === site.id ? lastSvg : null); }
+    function shownSvg() { return nowSvg() || (lastFor && !lastFor[3] && site && lastFor[2] === site.id ? lastSvg : null); }
     // the map being edited as it is now, for the viewer's menu (user, 2026-11-13: "Download what is on the screen";
     // Download CellDesigner XML gave the site's file without the moves just made)
     window.m2EditNow = function () { return on && site && site.id && text ? { id: site.id, text: src(), svg: shownSvg(), file: name } : null; };
@@ -2203,7 +2225,7 @@
       if (!emptyClick()) return null;
       var tick = function (v) { return v ? '<span class="m2-cx-key" aria-hidden="true">\u2713</span>' : ''; };
       return [['Snap map to grid', snapMap], ['Pack all complexes', function () { pack([]); }],
-        ['Show grid', gridShow, tick(gridSet.shown), gridSet.shown], ['Snap to grid', gridSnap, tick(gridSet.snap), gridSet.snap]];
+        ['Show grid', gridShow, tick(gridSet.shown), gridSet.shown], ['Snap to grid', gridSnap, tick(gridSet.snap), gridSet.snap]].concat(afMapItems());   // under AF its activities' units (create.js)
     };
     // a bend point put where the right click was on a line (user, 2026-11-13: "not only remove anchor point, but also
     // add anchor point"; CellDesigner's right click Add Anchor Point): the same new point a drag on the line makes, left

@@ -1,85 +1,89 @@
 ---
-layout: null
-collection: kegg-hover
+layout: default
+title: Global metabolic map, hover
+permalink: /kegg/hover/
+icon: favicon-kegg
+icon_version: pl237
+collection: kegg
+noindex: true
 ---
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
-<title>Global map, hover</title>
-<link rel="icon" type="image/svg+xml" href="/images/favicon-kegg/favicon.svg?v=pl237">
-<link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-kegg/favicon-32.png?v=pl237">
-<link rel="apple-touch-icon" href="/images/favicon-kegg/apple-touch-icon.png?v=pl237">
+{% comment %}
+KEGG's global map with its own drawing, hover names and a click to the KEGG entry: the group Hover of the KEGG list
+(user, 2026-11-15: "a stable map that has a different format ... simply an image with hover possibility"). Not a page of
+the viewer: the viewer and its editor never load these pictures; the page only takes the viewer's look (the site's
+header, the list on the left that folds, the zoom buttons over the map). Its pictures in the private data repository,
+closed/kegg-hover/; the list is the KEGG page's own, closed/kegg/index.json.
+{% endcomment %}
 <style>
-  :root { --ink: #202124; --mute: #5f6368; --line: #dadce0; --accent: #1a73e8; --bg: #fff; }
-  * { box-sizing: border-box; }
-  [hidden] { display: none !important; }   /* .tabs and .zoom set display: flex, which would otherwise keep them on screen when signed out */
-  button:focus { outline: none; }
-  button:focus-visible { outline: 1px solid #bdc1c6; outline-offset: 1px; }   /* quiet, keyboard only */
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.4 Helvetica, Arial, sans-serif; }
-  header { display: flex; align-items: center; gap: 12px; padding: 6px 16px 7px; border-bottom: 1px solid #eceff1; flex-wrap: wrap; }
-  /* quiet, as the viewer: Helvetica Neue 300, no bold, no frames; the chosen tab in ink, the others grey */
-  header h1 { font: 300 20px/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: 1px; color: #333; margin: 0 8px 0 0; }   /* as the other collections' name, same place (user) */
-  .tabs { display: flex; gap: 14px; }
-  .tabs button, .zoom button { border: 0; background: none; color: #80868b; padding: 4px 2px; font: 300 14px "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: .5px; cursor: pointer; }
-  .tabs button[aria-pressed="true"] { color: var(--ink); }
-  .zoom button { width: 28px; height: 28px; border-radius: 4px; font-size: 16px; padding: 0; }
-  .zoom button:hover { background: #f1f3f4; }
-  #zfit { width: auto; padding: 0 6px; font-size: 13px; }
-  form button { border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 4px; padding: 4px 10px; font: inherit; cursor: pointer; }
-  form button:hover { background: #f1f3f4; }
-  .zoom { display: flex; gap: 2px; margin-left: auto; align-items: center; }
-  #note { color: var(--mute); font-size: 12px; }
-  #out:hover { color: var(--ink); background: none; }
-  #out { color: #9aa0a6; background: none; border: 0; padding: 0 0 0 10px; white-space: nowrap; cursor: pointer; width: auto; font: 300 12px "Helvetica Neue", Helvetica, Arial, sans-serif; }
-  body { display: flex; flex-direction: column; }
-  header { flex: none; }
-  main { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; }
+  {% include look-lines.css %}
+  #main { padding: 0; max-width: none; }
+  [hidden] { display: none !important; }
+  .hv { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: #fff; font: 14px/1.4 Helvetica, Arial, sans-serif; }
+  .hv.hv-out { display: none; }
+  .hv-nav { flex: none; width: 240px; box-sizing: border-box; padding: 12px 12px 0; border-right: 1px solid var(--m2-frame, #ddd); display: flex; flex-direction: column; min-height: 0; }
+  .hv-rail { height: 31px; display: flex; align-items: flex-start; border-bottom: 1px solid #e8eaed; margin-bottom: 8px; }
+  .hv-rail button { width: 24px; height: 24px; padding: 0; border: 0; background: none; color: #80868b; cursor: pointer; }
+  .hv-rail button:hover { color: #1e2022; }
+  .hv-rail svg { width: 21px; height: 21px; }
+  #hv-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+  .hv-item { display: block; font-size: 14px; line-height: 18px; padding: 2px 4px; border: 1px solid transparent; border-radius: 4px; color: #1e2022; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hv-item.hv-on { background: var(--m2-accent, #4183c4); color: #fff; }
+  .hv-sub { margin-left: 14px; }
+  .hv-group { display: block; width: 100%; text-align: left; font: inherit; font-size: 14px; color: #1e2022; background: none; border: 0; padding: 2px 5px 2px 0; margin-top: 6px; cursor: pointer; }
+  .hv-group:first-child { margin-top: 0; }
+  .hv-group::before { content: ''; float: right; width: 12px; height: 12px; margin-top: 3px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%23b4b4b4' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center / 12px; }
+  .hv-group.hv-shut::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M4 2l4 4-4 4' fill='none' stroke='%23b4b4b4' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+  .hv-group:focus, .hv-item:focus { outline: none; }
+  #out { align-self: flex-start; margin: 8px 0 12px; padding: 0 4px; border: 0; background: none; color: #9aa0a6; font: 300 12px "Helvetica Neue", Helvetica, Arial, sans-serif; cursor: pointer; }
+  #out:hover { color: #1e2022; }
+  .hv-list-shut .hv-nav { width: 48px; }
+  .hv-list-shut #hv-list, .hv-list-shut #out { display: none; }
+  .hv-list-shut .hv-rail { border-bottom: 0; }
+  .hv-map { position: relative; flex: 1; min-width: 0; overflow: hidden; touch-action: none; }
   #view { position: absolute; inset: 0; cursor: grab; }
   #view.drag { cursor: grabbing; }
   #view svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
-  #tip { position: fixed; pointer-events: none; max-width: min(420px, calc(100vw - 16px)); white-space: pre-line; background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; font-size: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.15); display: none; z-index: 5; }
-  @media (max-width: 560px) { .zoom { margin-left: 0; } }
-  #signin { max-width: 360px; margin: 64px auto; padding: 0 16px; }
-  #signin input { display: block; width: 100%; margin: 4px 0 12px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 4px; font: inherit; }
-  #signin input:focus { outline: none; border-color: #999; }   /* as the viewer's search field */
-  #signin p { color: var(--mute); }
+  .hv-ctrl { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; align-items: center; }
+  .hv-ctrl button { font-size: 13px; min-width: 28px; padding: 2px 8px; color: #222; background: #fffffff0; border: 1px solid #bbb; border-radius: 4px; cursor: pointer; }
+  .hv-ctrl button:hover { background: var(--m2-accent, #4183c4); border-color: var(--m2-accent, #4183c4); color: #fff; }
+  #note { color: #666; font-size: 12px; background: #fffffff0; padding: 2px 6px; border-radius: 4px; }
+  #note:empty { display: none; }
+  #tip { position: fixed; pointer-events: none; max-width: min(420px, calc(100vw - 16px)); white-space: pre-line; background: #fff; border: 1px solid #dadce0; border-radius: 4px; padding: 6px 8px; font-size: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.15); display: none; z-index: 5; }
+  @media (max-width: 640px) { .hv { flex-direction: column; } .hv-nav { width: auto; max-height: 150px; border-right: 0; border-bottom: 1px solid #ddd; padding-bottom: 8px; } .hv-list-shut .hv-nav { width: auto; max-height: none; } }
+  #signin { max-width: 360px; margin-left: auto; margin-right: auto; padding: 48px 16px 0; font: 14px/1.4 Helvetica, Arial, sans-serif; }
+  #signin input { display: block; width: 100%; box-sizing: border-box; margin: 4px 0 12px; padding: 6px 8px; border: 1px solid #dadce0; border-radius: 4px; font: inherit; }
+  #signin input:focus { outline: none; border-color: #999; }
+  #signin p { color: #5f6368; }
+  #signin button { border: 1px solid #dadce0; background: #fff; border-radius: 4px; padding: 4px 10px; font: inherit; cursor: pointer; }
+  #signin button:hover { background: var(--m2-accent, #4183c4); border-color: var(--m2-accent, #4183c4); color: #fff; }
   #msg { color: #c5221f; min-height: 1.4em; }
 </style>
-</head>
-<body>
-<header>
-  <h1 data-forge-title>{% assign col = site.data.collections | where: "id", page.collection | first %}{{ col.name }}</h1>
-  <div class="tabs" id="tabs" hidden>
-    <button type="button" data-map="kegg-2026" aria-pressed="false" title="KEGG map 01100 as it is now">Current</button>
-    <button type="button" data-map="kegg-2017" aria-pressed="false" title="KEGG map 01100 of 2017, with the class boxes">2017, with classes</button>
-  </div>
-  <span id="note"></span>
-  <div class="zoom" id="zoom" hidden>
-    <button type="button" id="zin" aria-label="Zoom in">+</button>
-    <button type="button" id="zout" aria-label="Zoom out">&minus;</button>
-    <button type="button" id="zfit" title="Whole map">Fit</button>
+<form id="signin" hidden autocomplete="on">
+  <p>This page reads its maps from a private repository. Sign in with the site's token.</p>
+  <label for="u">Repository</label>
+  <input id="u" name="username" autocomplete="username" placeholder="owner/repository" required>
+  <label for="p">Token</label>
+  <input id="p" name="password" type="password" autocomplete="current-password" required>
+  <div id="msg"></div>
+  <button type="submit">Sign in</button>
+</form>
+<div class="hv hv-out" id="hv">
+  <nav class="hv-nav">
+    <div class="hv-rail"><button type="button" id="hv-fold" title="Maps" aria-label="Maps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r=".6" fill="currentColor"/><circle cx="4.5" cy="12" r=".6" fill="currentColor"/><circle cx="4.5" cy="18" r=".6" fill="currentColor"/></svg></button></div>
+    <div id="hv-list"></div>
     <button type="button" id="out" title="Forget the token in this browser">Sign out</button>
+  </nav>
+  <div class="hv-map">
+    <div id="view"></div>
+    <div class="hv-ctrl"><span id="note"></span><button type="button" id="zout" aria-label="Zoom out">&minus;</button><button type="button" id="zin" aria-label="Zoom in">+</button><button type="button" id="zfit" title="Whole map">Fit</button></div>
   </div>
-</header>
-<main id="main">
-  <form id="signin" hidden autocomplete="on">
-    <p>This page reads its maps from a private repository. Sign in with the site's token.</p>
-    <label for="u">Repository</label>
-    <input id="u" name="username" autocomplete="username" placeholder="owner/repository" required>
-    <label for="p">Token</label>
-    <input id="p" name="password" type="password" autocomplete="current-password" required>
-    <div id="msg"></div>
-    <button type="submit">Sign in</button>
-  </form>
-  <div id="view" hidden></div>
-</main>
+</div>
 <div id="tip"></div>
 <script>
 (function () {
   // the first page of /kegg/ (2026-11-14), kept at /kegg/hover/: its own drawing, hover names, a click to the KEGG entry.
+  // Since 2026-11-15 (user) the group Hover of the KEGG list, in the viewer's look: the list is the KEGG page's own
+  // (closed/kegg/index.json), its maps open /kegg/, its links (kind "link") this page on their picture (?map=).
   // One sign-in with /kegg/ and the editor: the token is kept under the viewer's key, the repository is the site's own.
   var KEY = 'atlas-edit-token', DIR = 'closed/kegg-hover', CACHE = 'closed-kegg-hover';
   var OWNER = location.hostname.split('.')[0], REPO = OWNER + '/' + OWNER;
@@ -148,7 +152,7 @@ collection: kegg-hover
   }
 
   function showSignin(text) {
-    $('signin').hidden = false; $('view').hidden = true; $('tabs').hidden = true; $('zoom').hidden = true;
+    $('signin').hidden = false; $('hv').classList.add('hv-out');
     tip.style.display = 'none';
     $('msg').textContent = text || '';
     $('u').value = REPO;
@@ -173,9 +177,11 @@ collection: kegg-hover
       if (!Array.isArray(list)) throw new Error(DIR + ' is not a folder');
       list.forEach(function (f) { files[f.name] = f.sha; });
       if (typed) { try { localStorage.setItem(KEY, cred.token); } catch (e) {} }
-      $('signin').hidden = true; $('view').hidden = false; $('tabs').hidden = false; $('zoom').hidden = false;
-      var first = 'kegg-2026';
+      $('signin').hidden = true; $('hv').classList.remove('hv-out');
+      var asked = new URLSearchParams(location.search).get('map'), first = 'kegg-2026';
       try { if (localStorage.getItem('closed-kegg-hover-map') === 'kegg-2017') first = 'kegg-2017'; } catch (e) {}
+      if (asked && files[asked + '.svg']) first = asked;
+      api('/contents/closed/kegg/index.json', true).then(function (t) { list(JSON.parse(t)); }).catch(function () { list(null); });
       show(first).then(function () {   // then the other map, quietly
         Object.keys(files).forEach(function (f) { if (/\.svg$/.test(f)) load(f.replace(/\.svg$/, '')).catch(function () {}); });
       });
@@ -202,8 +208,58 @@ collection: kegg-hover
     tx = cx - (cx - tx) * f; ty = cy - (cy - ty) * f; s = ns; apply();
   }
   function press(name) {
-    [].forEach.call(document.querySelectorAll('#tabs button'), function (b) { b.setAttribute('aria-pressed', b.dataset.map === name); });
+    [].forEach.call(document.querySelectorAll('#hv-list .hv-item'), function (b) { b.classList.toggle('hv-on', b.dataset.map === name); });
+    if (name && new URLSearchParams(location.search).get('map') !== name) history.replaceState(null, '', '?map=' + name);
   }
+
+  // the list: the KEGG page's maps (each opens /kegg/ on it) and its groups; a link to this page switches the picture in
+  // place. A group folds by a click on its name, kept in this browser as on /kegg/ (the viewer's own key, atlas-closed)
+  var closedKey = 'atlas-closed:/kegg/', shut = {};
+  try { shut = JSON.parse(localStorage.getItem(closedKey) || '{}') || {}; } catch (e) {}
+  var entries = null;
+  function list(index) {
+    if (index) entries = index;
+    var box = $('hv-list'), group = null;
+    box.innerHTML = '';
+    var all = entries || [{ topic: 'Current', group: 'Hover', kind: 'link', url: '?map=kegg-2026' },
+                          { topic: '2017, with classes', group: 'Hover', kind: 'link', url: '?map=kegg-2017' }];
+    // as the viewer: maps first, then the links, each in its group
+    all = all.filter(function (e) { return e.kind !== 'link'; }).concat(all.filter(function (e) { return e.kind === 'link'; }));
+    all.forEach(function (e) {
+      if (e.group && e.group !== group) {
+        group = e.group;
+        var g = document.createElement('button'), name = group;
+        g.type = 'button'; g.className = 'hv-group' + (shut[name] ? ' hv-shut' : ''); g.textContent = name;
+        g.addEventListener('click', function () {
+          shut[name] = !shut[name];
+          try { localStorage.setItem(closedKey, JSON.stringify(shut)); } catch (x) {}
+          list();
+        });
+        box.appendChild(g);
+      }
+      var mine = e.kind === 'link' && /[?&]map=([\w-]+)/.exec(e.url || '');
+      if (e.group && shut[e.group] && !(mine && mine[1] === want)) return;   // the picture shown keeps its line
+      var a = document.createElement('a');
+      a.className = 'hv-item' + (e.group ? ' hv-sub' : '');
+      a.textContent = e.topic || e.title;
+      if (e.note) a.title = (e.topic || e.title) + ', ' + e.note;
+      if (mine) {
+        a.dataset.map = mine[1]; a.href = '?map=' + mine[1];
+        a.addEventListener('click', function (ev) { ev.preventDefault(); show(mine[1]); });
+      } else a.href = '{{ site.baseurl }}/kegg/#' + e.id;
+      box.appendChild(a);
+    });
+    press(want);
+  }
+  // the list's sign folds the list away to its icons, kept in this browser
+  var foldKey = 'kegg-hover-list-shut';
+  function fold(v) {
+    $('hv').classList.toggle('hv-list-shut', v);
+    try { if (v) localStorage.setItem(foldKey, '1'); else localStorage.removeItem(foldKey); } catch (e) {}
+    apply();
+  }
+  try { if (localStorage.getItem(foldKey) === '1') $('hv').classList.add('hv-list-shut'); } catch (e) {}
+  $('hv-fold').addEventListener('click', function () { fold(!$('hv').classList.contains('hv-list-shut')); });
   // a map switch shows the whole new map (the two versions differ in size and layout); only the last one asked for shows
   function show(name) {
     want = name; press(name);
@@ -222,9 +278,6 @@ collection: kegg-hover
       $('note').textContent = 'Could not load this map: ' + why(e);
     });
   }
-  [].forEach.call(document.querySelectorAll('#tabs button'), function (b) {
-    b.addEventListener('click', function () { show(b.dataset.map); });
-  });
   $('zin').addEventListener('click', function () { var r = view.getBoundingClientRect(); zoomAt(1.4, r.width / 2, r.height / 2); });
   $('zout').addEventListener('click', function () { var r = view.getBoundingClientRect(); zoomAt(1 / 1.4, r.width / 2, r.height / 2); });
   $('zfit').addEventListener('click', fit);
@@ -269,7 +322,7 @@ collection: kegg-hover
     hover(ev, el);
   });
   view.addEventListener('pointercancel', up);
-  window.addEventListener('resize', apply);
+  window.addEventListener('resize', function () { place(); apply(); });
 
   // what KEGG (or iPath) shows for the element
   var tip = $('tip');
@@ -294,9 +347,12 @@ collection: kegg-hover
   }
   view.addEventListener('pointerleave', function (ev) { if (ev.pointerType === 'mouse') tip.style.display = 'none'; });
 
+  // the list and map fill the window under the site's header (the header's own height, whatever the zoom)
+  function place() {
+    var h = document.querySelector('.wrapper-masthead');
+    $('hv').style.top = $('signin').style.marginTop = (h ? h.offsetTop + h.offsetHeight : 0) + 'px';
+  }
+  place();
   if (cred && cred.token) start(false); else showSignin('');
 })();
 </script>
-{% include forge-switch.html %}
-</body>
-</html>

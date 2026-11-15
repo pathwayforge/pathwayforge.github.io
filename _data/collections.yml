@@ -8,10 +8,6 @@
   name: KEGG global metabolic map
   path: /kegg/
   accent: "#3f8a5a"
-- id: kegg-hover
-  name: KEGG global map, hover
-  path: /kegg/hover/
-  accent: "#3f8a5a"
 - id: reconmap
   name: ReconMap
   path: /reconmap/

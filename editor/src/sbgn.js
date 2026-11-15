@@ -6,6 +6,17 @@
     // alike. text is that GraphML, sb.base the SBGN-ML text editing started from, src() the SBGN-ML text with the moves.
     // A map of the site saves its edited copy to its editPath (maps/sbgn-ml/...), the file it came from left unchanged.
     var sbp = null, sbJs = null, sb = null;   // the SBGN-ML side loading, loaded, the file edited ({ base: its text, g0: the build's GraphML })
+    // a map made here (New map, own.js): drawn and edited from the converter's GraphML of an empty map, sbgn_edit.graphml
+    // making every glyph drawn since (the same drawing as the converter's, checked on every kind the palette makes); its
+    // map id says so, so only such a file is taken back from the folder or Add map from file (another editor's may hold
+    // what this way cannot draw: complex members, association)
+    var EMPTY_BASE = '<?xml version=\'1.0\' encoding=\'UTF-8\'?>\n<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:y="http://www.yworks.com/xml/graphml">\n' +
+      '  <key for="node" id="ng" yfiles.type="nodegraphics"/>\n  <key for="graphml" id="res" yfiles.type="resources"/>\n  <key for="edge" id="eg" yfiles.type="edgegraphics"/>\n' +
+      '  <graph edgedefault="directed" id="G"/>\n  <data key="res">\n    <y:Resources/>\n  </data>\n</graphml>\n';
+    var baseURL = null;
+    function emptyBase() { return baseURL || (baseURL = URL.createObjectURL(new Blob([EMPTY_BASE], { type: 'application/xml' }))); }
+    var NEW_ID = 'viewer-new-map';
+    function madeHere(t) { return new RegExp('<map\\s[^>]*id="' + NEW_ID + '"').test(t.slice(0, 3000)); }
     function isSb(t) { return /<([\w.-]+:)?sbgn[\s>]/.test(t.slice(0, 3000)); }
     function sbMap(m) { return !!(m && !m.shownAs && (m.site || m).editBase); }   // shown from another file (Settings' Source): not this one
     function sbpy() {   // sbgn_edit.js, then the yEd renderer

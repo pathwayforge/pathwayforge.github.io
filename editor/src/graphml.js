@@ -18,9 +18,101 @@
       return yrp;
     }
     function drawGraphml(t) {   // the document the editor read is drawn when it is still this text (no second reading)
-      var r = window.yrender.render(t === docText && doc ? doc : t, { classes: true, groups: true });
-      hpMemo = [t, r.ports];   // the processes' ports as drawn, for Turn process and modifier ends (hubPorts)
-      return [r.svg, r.errors];
+      var A = afSbgn ? afGraphml(t === docText && doc ? doc.cloneNode(true) : new DOMParser().parseFromString(t, 'application/xml')) : null;
+      var r = window.yrender.render(A ? A.doc : t === docText && doc ? doc : t, { classes: true, groups: true });
+      if (!A) hpMemo = [t, r.ports];   // the processes' ports as drawn, for Turn process and modifier ends (hubPorts); not from the SBGN AF view's changed lines
+      return [A ? afUnits(r.svg, A.units) : r.svg, r.errors];
+    }
+    // the SBGN view of an Activity Flow map (user, 2026-11-15: the palette's AF tab, SBGN view; only on a map with no
+    // process, create.js palLookNow): each entity drawn as a biological activity, a sharp-cornered rectangle, with a small
+    // unit of information in the entity's shape at its top right: an activity's own unit (the node properties SBGN class
+    // and SBGN unit, sbgn_edit), none when it has none (user, 2026-11-15, as SBGN's own AF examples: "if there is no
+    // auxiliary unit, it's a protein activity"), another entity's by its kind, none on a protein; a perturbation drawn as
+    // itself); its state variables and units of information and a complex's members not drawn (never deleted:
+    // the file keeps them, Reduced notation shows them again), a line to a member drawn to its complex. The drawing
+    // only: the editor's GraphML and the file stay as they are
+    var afSbgn = false;
+    var AF_KINDS = /^(Macromolecule|SimpleChemical|NucleicAcidFeature|UnspecifiedEntity|Complex)$/;
+    var AF_UNIT = { SimpleChemical: 'simple chemical', NucleicAcidFeature: 'nucleic acid feature', UnspecifiedEntity: 'unspecified entity', Complex: 'complex' };   // an entity's unit, by its kind
+    function afGraphml(d) {   // d: a document of its own, changed in place
+      var units = [], up = {}, keys = {};
+      Array.prototype.forEach.call(d.getElementsByTagNameNS(G, 'key'), function (k) { if (k.getAttribute('for') === 'node') keys[k.getAttribute('id')] = k.getAttribute('attr.name'); });
+      var prop = function (n, name) { var x = Array.prototype.filter.call(n.childNodes, function (c) { return c.localName === 'data' && keys[c.getAttribute('key')] === name; })[0]; return x ? x.textContent.trim() : null; };
+      var ownNode = function (e) { for (var q = e.parentNode; q; q = q.parentNode) if (q.localName === 'node' && q.namespaceURI === G) return q; return null; };
+      Array.prototype.slice.call(d.getElementsByTagNameNS(G, 'node')).forEach(function (n) {
+        if (up[n.getAttribute('id')]) return;   // a member, cut with its complex's graph
+        var rs = ['GenericNode', 'GenericGroupNode'].reduce(function (a, k) { return a.concat(Array.prototype.slice.call(n.getElementsByTagNameNS(Y, k))); }, []).filter(function (r) { return ownNode(r) === n; });
+        var kind = null;
+        rs.forEach(function (r) {
+          var k = (r.getAttribute('configuration') || '').replace('com.yworks.sbgn.', '');
+          if (!AF_KINDS.test(k)) return;
+          kind = kind || k;
+          r.setAttribute('configuration', 'com.yworks.sbgn.Macromolecule');
+          Array.prototype.slice.call(r.getElementsByTagNameNS(Y, 'StyleProperties')).forEach(function (x) { x.parentNode.removeChild(x); });
+          var sp = d.createElementNS(Y, 'y:StyleProperties'), pr = d.createElementNS(Y, 'y:Property');
+          pr.setAttribute('class', 'java.lang.Integer'); pr.setAttribute('name', 'com.yworks.sbgn.style.radius'); pr.setAttribute('value', '0');
+          sp.appendChild(pr); r.appendChild(sp);
+          Array.prototype.slice.call(r.getElementsByTagNameNS(Y, 'NodeLabel')).forEach(function (l) { if (l.getAttribute('iconData')) l.parentNode.removeChild(l); });
+        });
+        if (!kind) return;
+        var r0 = realizerOf(n) || rs[0], g = r0.getElementsByTagNameNS(Y, 'Geometry')[0];   // the active realizer's box (the review: a closed complex's other one)
+        var act = prop(n, 'SBGN class') === 'biological activity';
+        units.push([n.getAttribute('id'), act ? prop(n, 'SBGN unit') || '' : AF_UNIT[kind] || '', +g.getAttribute('x'), +g.getAttribute('y'), +g.getAttribute('width'), +g.getAttribute('height')]);
+        Array.prototype.slice.call(n.childNodes).forEach(function (c) {   // a complex's members: not drawn, their lines to it
+          if (c.localName !== 'graph') return;
+          var names = [];
+          Array.prototype.forEach.call(c.getElementsByTagNameNS(G, 'node'), function (m) {
+            up[m.getAttribute('id')] = n.getAttribute('id');
+            var ml = Array.prototype.filter.call(m.getElementsByTagNameNS(Y, 'NodeLabel'), function (l) { return !l.getAttribute('iconData') && l.textContent.trim(); })[0];
+            if (ml && !m.getElementsByTagNameNS(G, 'graph').length) names.push(ml.textContent.trim());
+          });
+          n.removeChild(c);
+          // an unnamed complex named by its members, as MINERVA and CellDesigner name one (A:B), centred as an activity's name
+          rs.forEach(function (r) {
+            var l = Array.prototype.filter.call(r.getElementsByTagNameNS(Y, 'NodeLabel'), function (x) { return !x.getAttribute('iconData'); })[0];
+            if (!l) return;
+            if (!l.textContent.trim() && names.length) { while (l.firstChild) l.removeChild(l.firstChild); l.appendChild(d.createTextNode(names.join(':'))); l.setAttribute('hasText', 'true'); }
+            l.setAttribute('modelName', 'internal'); l.setAttribute('modelPosition', 'c');
+          });
+        });
+      });
+      Array.prototype.slice.call(d.getElementsByTagNameNS(G, 'edge')).forEach(function (e) {
+        var p = e.getElementsByTagNameNS(Y, 'Path')[0];
+        if (up[e.getAttribute('source')] && up[e.getAttribute('source')] === up[e.getAttribute('target')]) { e.parentNode.removeChild(e); return; }   // between two members of one complex: inside it
+        [['source', 'sx', 'sy'], ['target', 'tx', 'ty']].forEach(function (q) {
+          var to = up[e.getAttribute(q[0])];
+          if (!to) return;
+          e.setAttribute(q[0], to);
+          if (p) { p.setAttribute(q[1], '0.0'); p.setAttribute(q[2], '0.0'); }
+        });
+      });
+      return { doc: d, units: units };
+    }
+    function afUnits(svg, units) {   // each activity's unit of information, last in its node's group so it lies over the top edge
+      var esc = function (x) { return x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;'); };   // as yrender's esc
+      var byId = {};
+      units.forEach(function (u) {
+        // small, at the top right (user, 2026-11-15: "on the right side, on the top right"; "1 to 2 to 1 for protein and 1
+        // by 1 for metabolite"): its box sbgn_edit's afUnitBox, the one the file is given; no text
+        var B = sbJs.afUnitBox(u.slice(2), u[1]);
+        if (!B) return;   // none: a protein's activity
+        var x = B[0], y = B[1], w = B[2], h = B[3], c = h * 0.3, m = y + h / 2, f = function (v) { return Math.round(v * 100) / 100; }, k = sbJs.unitClass(u[1]), D;
+        if (k === 'macromolecule') D = 'M' + f(x + c) + ' ' + f(y) + 'H' + f(x + w - c) + 'Q' + f(x + w) + ' ' + f(y) + ' ' + f(x + w) + ' ' + f(y + c) + 'V' + f(y + h - c) + 'Q' + f(x + w) + ' ' + f(y + h) + ' ' + f(x + w - c) + ' ' + f(y + h) +
+          'H' + f(x + c) + 'Q' + f(x) + ' ' + f(y + h) + ' ' + f(x) + ' ' + f(y + h - c) + 'V' + f(y + c) + 'Q' + f(x) + ' ' + f(y) + ' ' + f(x + c) + ' ' + f(y) + 'Z';   // rounded corners, as the protein's own
+        else if (k === 'nucleic acid feature') D = 'M' + f(x) + ' ' + f(y) + 'H' + f(x + w) + 'V' + f(y + h - c) + 'Q' + f(x + w) + ' ' + f(y + h) + ' ' + f(x + w - c) + ' ' + f(y + h) + 'H' + f(x + c) + 'Q' + f(x) + ' ' + f(y + h) + ' ' + f(x) + ' ' + f(y + h - c) + 'Z';
+        else if (k === 'complex') D = 'M' + f(x + c) + ' ' + f(y) + 'H' + f(x + w - c) + 'L' + f(x + w) + ' ' + f(y + c) + 'V' + f(y + h - c) + 'L' + f(x + w - c) + ' ' + f(y + h) + 'H' + f(x + c) + 'L' + f(x) + ' ' + f(y + h - c) + 'V' + f(y + c) + 'Z';
+        else if (k === 'phenotype') D = 'M' + f(x) + ' ' + f(y) + 'H' + f(x + w) + 'L' + f(x + w - c) + ' ' + f(m) + 'L' + f(x + w) + ' ' + f(y + h) + 'H' + f(x) + 'L' + f(x + c) + ' ' + f(m) + 'Z';   // a perturbation's unit: the perturbing agent's shape
+        else D = 'M' + f(x) + ' ' + f(m) + 'A' + f(w / 2) + ' ' + f(h / 2) + ' 0 1 0 ' + f(x + w) + ' ' + f(m) + 'A' + f(w / 2) + ' ' + f(h / 2) + ' 0 1 0 ' + f(x) + ' ' + f(m) + 'Z';   // a simple chemical's circle, an unspecified entity's ellipse
+        byId[esc(u[0])] = '<path d="' + D + '" fill="white" class="c-white" stroke="#000000"/>';
+      });
+      // one pass over the drawing: each node group's own closing tag takes its unit
+      var out = [], at = 0, stack = [], re = /<g data-n="([^"]*)">|<g[\s>]|<\/g>/g, mt;
+      while ((mt = re.exec(svg))) {
+        if (mt[0] === '</g>') { var id = stack.pop(); if (id && byId[id]) { out.push(svg.slice(at, mt.index), byId[id]); at = mt.index; } }
+        else stack.push(mt[1] || null);
+      }
+      out.push(svg.slice(at));
+      return out.join('');
     }
     function liveDraw() {   // the compartments' outlines and labels on the picture follow their live boxes (GraphML)
       if (!gN || cd) return;

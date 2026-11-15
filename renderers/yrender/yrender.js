@@ -404,7 +404,7 @@
     return [hs ? (!ht && bare && get(ar, 'source') === 'none' && !this.nodes[get(e, 'source')].eq ? 'in' : 'out') : null, ht && bare ? 'in' : null];
   };
   YMap.prototype.hubPorts = function () {
-    var self = this, ins = Object.create(null), outs = Object.create(null), given = Object.create(null), near = Object.create(null);
+    var self = this, ins = Object.create(null), outs = Object.create(null), given = Object.create(null), near = Object.create(null), lead = Object.create(null);
     var add = function (m, k, p) { (m[k] = m[k] || []).push(p); };
     this.order.forEach(function (item) {
       if (item[0] !== 'e') return;
@@ -414,6 +414,7 @@
       var bends = kids(path, Y, 'Point').map(function (q) { return [pyFloat(get(q, 'x')), pyFloat(get(q, 'y'))]; });
       var at = self.ends(e, kid(pl, Y, 'Arrows'));
       if (at[1] === 'in') { add(ins, t, bends.length ? bends[bends.length - 1] : self.mid(s)); self.given(given, t, 'in', path, 'tx', 'ty'); add(near, t + '\u0000in', s); }
+      if (at[0] === 'out') add(lead, s, bends.concat([self.mid(t)]));   // its points, for the stick it leaves from
       if (at[0]) { add(at[0] === 'in' ? ins : outs, s, bends.length ? bends[0] : self.mid(t)); self.given(given, s, at[0], path, 'sx', 'sy'); add(near, s + '\u0000' + at[0], t); }
     });
     var mean = function (q) {
@@ -448,11 +449,21 @@
       var st = n.stroke, col = st ? st[0] : '#000000', wa = st && st[1] !== 1 ? ' stroke-width="' + num(st[1]) + '"' : '';
       var e1 = clip(one, [cx, cy], n.polys), e2 = clip(two, [cx, cy], n.polys);
       var nIn = near[nid + '\u0000in'] || [], nOut = near[nid + '\u0000out'] || [];
-      var d1 = self.stickEnd(nid, e1, one, I.length ? nIn : nIn.concat(nOut)), d2 = self.stickEnd(nid, e2, two, nOut);   // reversible: either
-      var ant = '<path d="M' + num(d1[0]) + ' ' + num(d1[1]) + ' L' + num(e1[0]) + ' ' + num(e1[1]) + ' M' + num(e2[0]) + ' ' + num(e2[1]) +
-        ' L' + num(d2[0]) + ' ' + num(d2[1]) + '" fill="none"' + ink('stroke', col) + wa + '/>';
+      // a stick only where an arc is attached (user, 2026-11-15; yrender.py's hub_ports): nothing coming in, each leaving arc on the nearer port
+      var use1 = I.length > 0, use2 = O.length > 0 && I.length > 0;
+      if (!I.length) (lead[nid] || []).forEach(function (L) {
+        var j = 0;
+        while (j < L.length - 1 && self.onStick(nid, L[j])) j++;   // bends on a stick left out first, as the edge's drawing does
+        var q = L[j];
+        if (dist(two, q) <= dist(one, q)) use2 = true; else use1 = true;
+      });
+      var d = '', d1, d2;
+      if (use1) { d1 = self.stickEnd(nid, e1, one, I.length ? nIn : nIn.concat(nOut)); d += 'M' + num(d1[0]) + ' ' + num(d1[1]) + ' L' + num(e1[0]) + ' ' + num(e1[1]); }   // reversible: either
+      if (use2) { d2 = self.stickEnd(nid, e2, two, nOut); d += (d ? ' ' : '') + 'M' + num(e2[0]) + ' ' + num(e2[1]) + ' L' + num(d2[0]) + ' ' + num(d2[1]); }
+      var ant = '<path d="' + d + '" fill="none"' + ink('stroke', col) + wa + '/>';
       n.svg = self.groups ? n.svg.replace(/^(<g data-n="[^"]*">)/, function (m) { return m + ant; }) : ant + n.svg;
-      self.boxes.push([one[0], one[1], 0, 0], [two[0], two[1], 0, 0]);
+      if (use1) self.boxes.push([one[0], one[1], 0, 0]);
+      if (use2) self.boxes.push([two[0], two[1], 0, 0]);
     });
   };
   YMap.prototype.stickEnd = function (nid, base, tip, near) {   // yrender.py's stick_end
@@ -659,8 +670,7 @@
     return '<g transform="' + m + '">' + inner + '</g>';
   };
   YMap.prototype.svg = function () {
-    var xs = this.boxes, self = this;
-    if (!xs.length) throw new Error('ValueError: min() arg is an empty sequence');
+    var xs = this.boxes.length ? this.boxes : [[0, 0, 0, 0]], self = this;   // an empty map (a new one): an empty picture of its margins
     var mn = function (f) { return xs.reduce(function (a, g) { return Math.min(a, f(g)); }, Infinity); };
     var mx = function (f) { return xs.reduce(function (a, g) { return Math.max(a, f(g)); }, -Infinity); };
     var x0 = Math.floor(mn(function (g) { return g[0]; })) - MARGIN, y0 = Math.floor(mn(function (g) { return g[1]; })) - MARGIN;

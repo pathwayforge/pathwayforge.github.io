@@ -238,18 +238,25 @@
         return [st ? svText(st.getAttribute('value'), st.getAttribute('variable')) : '', (cx - B[0] - B[2] / 2) / B[2], (cy - B[1] - B[3] / 2) / B[3]];
       });
     };
+    var perf = {};   // activities the converter draws as the entity of their performance arc (Newt's hybrid maps): not nodes
+    Object.keys(S.arc).forEach(function (k) { if (S.arc[k].getAttribute('class') === 'performance arc') perf[S.arc[k].getAttribute('target')] = 1; });
     Object.keys(S.glyph).forEach(function (id) {
-      var g = S.glyph[id], cls = g.el.getAttribute('class') || '', lab = kid(g.el, 'label'), name = lab ? lab.getAttribute('text') || '' : '';
+      var g = S.glyph[id], cls = g.el.getAttribute('class') || '', name = nameIn(g.el);
+      var au = cls === 'biological activity' ? fileUnit(g.el) : null;   // an activity: its unit
       if (!G.node[id]) {
-        var base = cls.replace(/ multimer$/, '');
-        if (!MAKE[base] || g.el.parentNode.localName !== 'map') return;
-        St = St || styles(S); D = D || {}; D[base] = D[base] || defaults(t, opt, base);
+        var base = au != null ? actCls(au) : cls.replace(/ multimer$/, ''), dk = au != null ? cls : base;
+        if (!MAKE[base] || g.el.parentNode.localName !== 'map' || perf[id]) return;
+        St = St || styles(S); D = D || {}; D[dk] = D[dk] || defaults(t, opt, dk);
         var lk = fileLook(St, id), cref = g.el.getAttribute('compartmentRef');
-        out = add(out, { id: id, cls: base, label: name, box: g.box, parent: cref && S.glyph[cref] ? cref : null, fill: lk.fill, line: lk.line, width: lk.width, font: lk.font || D[base].font,
+        out = add(out, { id: id, cls: base, activity: au, label: name, box: g.box, parent: cref && S.glyph[cref] ? cref : null, fill: lk.fill, line: lk.line, width: lk.width, font: lk.font || D[dk].font,
                          states: svOf(g), units: unitsOf(g.el).map(unitText), multimer: fileMulti(g.el) }, opt);
         return;
       }
-      if (PROC.test(cls)) {   // a process's kind changed in a draft the base predates: its sign
+      if (au != null) {   // an activity's unit set in a draft the base predates, or a base of an older build without the properties
+        if (Hfor !== out) { H = gml(out, opt); Hfor = out; }
+        if (actOf(H, id) !== au) out = activity(out, id, au, opt);
+      }
+      if (PROC.test(cls) || GATES.test(cls)) {   // a process's (a gate's) kind changed in a draft the base predates: its sign
         if (Hfor !== out) { H = gml(out, opt); Hfor = out; }
         if (H.node[id] && classOfR(H.node[id].geo.parentNode) !== cls) out = kind(out, id, cls, opt);
         return;
@@ -289,7 +296,10 @@
   function write(t, gtext, opt) {
     var dropped = {}, was = gone(gtext);   // dropped: glyphs one of whose units of information was deleted; was: ids never given again (the comment stays with the GraphML)
     t = drop(t, was, opt, dropped);
-    var S = sbgn(t, opt), G = gml(gtext, opt), T = new Tags(t, S.doc);
+    var S = sbgn(t, opt), G = gml(gtext, opt);
+    var af = afNow(t, S, G);   // an Activity Flow map: activities and influences written as AF's (user, 2026-11-15)
+    if (af && !isAf(t)) { t = afLanguage(t); S = sbgn(t, opt); }
+    var T = new Tags(t, S.doc);
     var close = function (a, b) { return Math.abs(a - b) < 1e-6; };
     var iconsOf = function (id, kind) {   // [text, rx, ry] of a node's state variables (or units of information) in the GraphML
       return labelsOf(G, id).icons.filter(function (q) { return q[1].kind === (kind || 'StateVariable'); }).map(function (q) {
@@ -305,6 +315,13 @@
       if (!G.node[id] || !NAMED.test(g.el.getAttribute('class') || '')) return;
       var have = unitsOf(g.el).map(unitText), now = iconsOf(id, 'UnitOfInformation').map(function (q) { return q[0]; });
       if (dropped[id] || have.length !== now.length || have.some(function (u, j) { return u !== now[j]; })) uChanged[id] = 1;
+    });
+    // an activity's unit of information made another or taken off in the editor (activity()): its entity, its box where
+    // the editor draws it (afUnitBox), a unit given where it had none; written below, not mapped with the glyph
+    var aChanged = {};
+    Object.keys(S.glyph).forEach(function (id) {
+      var g = S.glyph[id], want = G.node[id] ? actOf(G, id) : null;
+      if (want != null && g.el.getAttribute('class') === 'biological activity' && want !== fileUnit(g.el)) aChanged[id] = want;
     });
     var setXY = function (el, p, kx, ky) {
       kx = kx || 'x'; ky = ky || 'y';
@@ -335,7 +352,7 @@
       var f = map[id] = function (p) { return [b[0] + (o[2] ? (p[0] - o[0]) * b[2] / o[2] : b[2] / 2), b[1] + (o[3] ? (p[1] - o[1]) * b[3] / o[3] : b[3] / 2)]; };
       kids(g.el, 'glyph').forEach(function (c) {   // state variables, units of information, glyphs the converter left out
         var cb = kid(c, 'bbox');
-        if (!cb || G.node[c.getAttribute('id')] || svMoved.has(cb) || (uChanged[id] && c.getAttribute('class') === 'unit of information')) return;
+        if (!cb || G.node[c.getAttribute('id')] || svMoved.has(cb) || ((uChanged[id] || aChanged[id] != null) && c.getAttribute('class') === 'unit of information')) return;
         var w = F(cb.getAttribute('w')), h = F(cb.getAttribute('h')), m = f([F(cb.getAttribute('x')) + w / 2, F(cb.getAttribute('y')) + h / 2]);
         setXY(cb, [m[0] - w / 2, m[1] - h / 2]);
       });
@@ -358,15 +375,36 @@
       return '\n' + ind + '<' + pre + 'glyph class="unit of information" id="' + esc(uid) + '">\n' + ind + '  <' + pre + 'label text="' + esc(txt) + '"/>\n' +
         ind + '  ' + bboxXml(b) + '\n' + ind + '</' + pre + 'glyph>';
     };
+    var actUnitXml = function (gid, unit, b, ind) {   // an activity's unit of information: its entity only, no text (user, 2026-11-15)
+      var uid = gid + '_ui0', j = 0;
+      while (S.glyph[uid] || S.port[uid] || S.arc[uid] || was.indexOf(uid) >= 0) uid = gid + '_ui0_' + (++j);
+      return '\n' + ind + '<' + pre + 'glyph class="unit of information" id="' + esc(uid) + '">\n' + ind + '  <' + pre + 'entity name="' + esc(unit) + '"/>\n' +
+        ind + '  ' + bboxXml(afUnitBox(b, unit)) + '\n' + ind + '</' + pre + 'glyph>';
+    };
+    Object.keys(aChanged).forEach(function (id) {
+      var g = S.glyph[id], want = aChanged[id], b = G.node[id].box, u = kids(g.el, 'glyph').filter(function (c) { return c.getAttribute('class') === 'unit of information'; })[0];
+      var e = u && kid(u, 'entity'), ub = u && kid(u, 'bbox');
+      if (u && !ub) return;
+      if (!want) { if (u) T.cut(unitText(u) ? e : u); return; }   // taken off (a unit with text keeps its text, its entity goes)
+      if (!u) { var e0 = T.end(g.bbox); T.ed.push([e0, e0, actUnitXml(id, want, b, T.indent(g.bbox))]); return; }
+      if (e) T.set(e, 'name', want);
+      else { var at4 = T.at.get(ub)[0]; T.ed.push([at4, at4, '<' + pre + 'entity name="' + esc(want) + '"/>\n' + T.indent(ub)]); }
+      var nb = afUnitBox(b, want);
+      ['x', 'y', 'w', 'h'].forEach(function (k, j) { if (!close(F(ub.getAttribute(k)), nb[j])) T.set(ub, k, num(nb[j])); });
+    });
     Object.keys(S.glyph).forEach(function (id) {   // a process made omitted or uncertain, or the generic one again (its sign in the GraphML)
-      var g = S.glyph[id], n = G.node[id], cls = g.el.getAttribute('class') || '', want = (n && PROC.test(cls) && classOfR(n.geo.parentNode)) || cls;
-      if (want !== cls) T.set(g.el, 'class', want);
+      var g = S.glyph[id], n = G.node[id], cls = g.el.getAttribute('class') || '', want = (n && (PROC.test(cls) || /^(and|or|not)$/.test(cls)) && classOfR(n.geo.parentNode)) || cls;
+      if (want !== cls) {
+        T.set(g.el, 'class', want);
+        var gl = GATES.test(want) && kid(g.el, 'label');   // a gate's label, as the converter writes it (AND, OR, NOT)
+        if (gl) T.set(gl, 'text', GATE[want]);
+      }
     });
     Object.keys(S.glyph).forEach(function (id) {
       var g = S.glyph[id], n = G.node[id], cls = g.el.getAttribute('class') || '';
       if (!n || !NAMED.test(cls)) return;
       var L = labelsOf(G, id), lab = kid(g.el, 'label');
-      if (L.main && ownText(L.main) !== (lab ? lab.getAttribute('text') || '' : '')) {
+      if (L.main && ownText(L.main) !== nameIn(g.el)) {
         if (lab) T.set(lab, 'text', ownText(L.main));
         else { var at1 = T.at.get(g.bbox)[0]; T.ed.push([at1, at1, '<' + pre + 'label text="' + esc(ownText(L.main)) + '"/>\n' + T.indent(g.bbox)]); }
       }
@@ -420,17 +458,20 @@
     var ind0 = last ? T.indent(last) : T.indent(mapEl) + '  ', fresh = '', front = '', made = {};
     G.ids.forEach(function (id) {
       if (S.glyph[id] || S.port[id] || S.arc[id] || id.indexOf('|') >= 0) return;
-      var n = G.node[id], cls = classOfR(n.geo.parentNode);
+      var n = G.node[id], cls = classOfR(n.geo.parentNode), act = af ? actOf(G, id) : null;
       if (!cls) return;
+      if (act != null) cls = 'biological activity';   // on an Activity Flow map (elsewhere written as its entity)
       made[id] = 1;
       var up = n.el.parentNode; while (up && up.localName !== 'node') up = up.parentNode;
       var uid = up && up.getAttribute('id'), cref = uid && (S.glyph[uid] ? S.glyph[uid].el.getAttribute('class') === 'compartment' : !!G.node[uid] && cfgOf(G.node[uid].geo.parentNode) === 'Compartment') ? uid : null;   // a compartment of the file or made with it
       var L = labelsOf(G, id), name = L.main && !PROC.test(cls) ? ownText(L.main) : '', lk = lookG(G, id);   // a process's sign is its class, no label
+      if (GATES.test(cls)) name = /^(equivalence|delay)$/.test(cls) ? '' : GATE[cls];   // a gate's label as sbgnml.write writes it (none on the equivalence, the spec 2.9.4, nor on a delay: its class says it)
       var fu = iconsOf(id, 'UnitOfInformation');
       var xml = '\n' + ind0 + '<' + pre + 'glyph class="' + cls + (isMulti(G, id) && MULTI.test(cls) ? ' multimer' : '') + '" id="' + esc(id) + '"' + (cref ? ' compartmentRef="' + esc(cref) + '"' : '') + '>' +
         (name ? '\n' + ind0 + '  <' + pre + 'label text="' + esc(name) + '"/>' : '') + '\n' + ind0 + '  ' + bboxXml(n.box) +
+        (act != null ? (act ? actUnitXml(id, act, n.box, ind0 + '  ') : '') :   // under AF no state variables or text units (create.js afMap)
         iconsOf(id).map(function (q, k) { return svXml(id, k, q, n.box, ind0 + '  '); }).join('') +
-        fu.map(function (q, k) { return uiXml(id, k, q[0], uBox(q[0], n.box, k, fu.length), ind0 + '  '); }).join('') + '\n' + ind0 + '</' + pre + 'glyph>';
+        fu.map(function (q, k) { return uiXml(id, k, q[0], uBox(q[0], n.box, k, fu.length), ind0 + '  '); }).join('')) + '\n' + ind0 + '</' + pre + 'glyph>';
       if (cls === 'compartment') front += xml; else fresh += xml;   // a compartment before the glyphs, as the editor draws it under them
       if (lk.fill || lk.line || lk.width !== 1) looks.set(id, { fill: lk.fill, line: lk.line, width: lk.width, font: L.main ? F(L.main.getAttribute('fontSize')) : null, cls: cls, fresh: true });
     });
@@ -454,14 +495,16 @@
       var a = S.arc[id], e = G.edge[id];
       if (!e) return;
       var E = ends(S, a), ref = [a.getAttribute('source'), a.getAttribute('target')], cls = a.getAttribute('class');
+      var hc = headClass(headOf(e)), pc = PD_ARC[cls] || cls;   // a modulation made another in the editor: its class from the arrowhead (an influence's under AF's name)
+      if (MODS.test(pc) && hc && MODS.test(hc) && hc !== pc) T.set(a, 'class', (af || PD_ARC[cls]) && AF_ARC[hc] ? AF_ARC[hc] : hc);
       // an end moved to another glyph (the editor, user 2026-11-14): the arc names that glyph, its port set below; the
       // arrowhead-less line is a consumption at a process and a logic arc at a gate (user: one connector for both)
       var moved = [0, 1].map(function (j) { var g = j ? e.t : e.s; return E[j] !== g && !!G.node[E[j]] && !!G.node[g] && !!S.glyph[g]; });
       moved.forEach(function (m, j) { if (m) { E[j] = ref[j] = j ? e.t : e.s; E[2 + j] = null; } });
       if (moved[0] || moved[1]) {
         var hub = (S.glyph[E[1]] && S.glyph[E[1]].el.getAttribute('class')) || '';
-        if (cls === 'consumption' && /^(and|or|not|equivalence)$/.test(hub)) cls = 'logic arc';
-        else if (cls === 'logic arc' && HUB.test(hub) && !/^(and|or|not|equivalence)$/.test(hub)) cls = 'consumption';
+        if (cls === 'consumption' && GATES.test(hub)) cls = 'logic arc';
+        else if (cls === 'logic arc' && HUB.test(hub) && !GATES.test(hub)) cls = 'consumption';
         if (cls !== a.getAttribute('class')) T.set(a, 'class', cls);
       }
       if (E[0] !== e.s || E[1] !== e.t || !G.node[E[0]] || !G.node[E[1]] || !S.glyph[E[0]] || !S.glyph[E[1]]) return;
@@ -520,7 +563,7 @@
           return;
         }
         var b2 = G.node[s.gid].box, out2 = Math.abs(P[0] - s.c[0]) > b2[2] / 2 + 0.5 || Math.abs(P[1] - s.c[1]) > b2[3] / 2 + 0.5;
-        var no = cls === 'production' ? 2 : cls === 'consumption' ? 1 : cls === 'logic arc' ? (q[0] === 'source' ? 2 : 1) : 0;   // a logic arc leaving a gate (into another gate) from its port two
+        var no = q[0] === 'source' ? 2 : /^(consumption|logic arc)$/.test(cls) ? 1 : 0;   // what leaves a process or gate (a production, a gate's output: a logic arc or a modulation) from its port two
         if (!s.zero && out2 && no && HUB.test(S.glyph[s.gid].el.getAttribute('class') || '')) {   // at a port of a process or gate
           // the arc named the glyph: now the port its glyph's other consumptions (products) use, else a port made
           var have = kids(S.glyph[s.gid].el, 'port').map(function (x) { return x.getAttribute('id'); }), other = use[s.gid + '\u0000' + (3 - no)];
@@ -545,7 +588,7 @@
       P[1] = P[1] || [2 * c[0] - P[2][0], 2 * c[1] - P[2][1]]; P[2] = P[2] || [2 * c[0] - P[1][0], 2 * c[1] - P[1][1]];
       var ind = '\n' + T.indent(g.bbox), e = T.end(g.bbox);
       T.ed.push([e, e, [1, 2].map(function (k) { return ind + '<' + (g.el.prefix ? g.el.prefix + ':' : '') + 'port id="' + esc(newId(gid, k)) + '" x="' + num(P[k][0]) + '" y="' + num(P[k][1]) + '"/>'; }).join('')]);
-      if (!g.el.getAttribute('orientation') && HUB.test(g.el.getAttribute('class') || '') && !/^(and|or|not|equivalence)$/.test(g.el.getAttribute('class'))) T.set(g.el, 'orientation', Math.abs(P[2][0] - P[1][0]) >= Math.abs(P[2][1] - P[1][1]) ? 'horizontal' : 'vertical');   // a bare process given its ports by its first arc
+      if (!g.el.getAttribute('orientation') && HUB.test(g.el.getAttribute('class') || '') && !GATES.test(g.el.getAttribute('class'))) T.set(g.el, 'orientation', Math.abs(P[2][0] - P[1][0]) >= Math.abs(P[2][1] - P[1][1]) ? 'horizontal' : 'vertical');   // a bare process given its ports by its first arc
     });
     // a process's orientation, where the file gives one, follows its ports
     Object.keys(S.glyph).forEach(function (gid) {
@@ -570,6 +613,7 @@
       if (!S2.glyph[e.s] || !S2.glyph[e.t] || !G.node[e.s] || !G.node[e.t]) return;   // an end the file does not have (a glyph the converter left out)
       var cls = arcClass(G, e, S2);
       if (!cls) return;
+      if (af && AF_ARC[cls]) cls = AF_ARC[cls];   // an influence (user, 2026-11-15: AF's names in an Activity Flow file)
       var pre2 = S2.doc.documentElement.prefix ? S2.doc.documentElement.prefix + ':' : '', pt = function (tag, p) { return '<' + pre2 + tag + ' x="' + num(p[0]) + '" y="' + num(p[1]) + '"/>'; };
       var A = [G.node[e.s].box, G.node[e.t].box].map(function (bb, j) { var c = centre(bb); return [c[0] + e.off[2 * j], c[1] + e.off[2 * j + 1]]; });
       // an end at the centre: where the line toward the next point leaves the box (sbgnml.at reads it back as the centre);
@@ -611,22 +655,32 @@
                // processes (user, 2026-11-14: "process, omitted, uncertain"; no association or dissociation, by choice): yEd's
                // Process, the omitted and the uncertain one labelled with their sign (graphml.PROCESS_LABEL); made bare, no
                // ports or orientation in the file until a first arc gives them (yrender draws no antennas without arcs)
-               process: 'Process', 'omitted process': 'Process', 'uncertain process': 'Process' };
+               process: 'Process', 'omitted process': 'Process', 'uncertain process': 'Process',
+               // logic gates (user, 2026-11-15: "let's add logic gates, including identity gate", the identity gate SBGN's
+               // equivalence operator): yEd's Operator labelled AND, OR, NOT or the equivalence's sign (graphml.EQUIV); made
+               // bare as a process is, its ports written by its first arc
+               and: 'Operator', or: 'Operator', not: 'Operator', equivalence: 'Operator',
+               // Activity Flow's delay (user, 2026-11-15: the palette's AF tab): yEd's Operator labelled tau (graphml.DELAY), drawn as the equivalence
+               delay: 'Operator' };
   var SIGN = { 'omitted process': '\\\\', 'uncertain process': '?' }, PROC = /^(process|omitted process|uncertain process)$/;
+  var GATE = { and: 'AND', or: 'OR', not: 'NOT', equivalence: '\u2261', delay: '\u03c4' }, GATES = /^(and|or|not|equivalence|delay)$/;   // sbgnml.OPERATORS
   // sizes at the map's scale: the converter's standard ones (style.py) where it has them, else on the 8 grid near the
   // templates' (an empty complex 144 by 64, the empty set 32)
   var SIZE = { macromolecule: [80, 40], 'simple chemical': [40, 40], 'nucleic acid feature': [80, 40], 'unspecified entity': [80, 40], complex: [144, 64],
                'perturbing agent': [80, 40], 'source and sink': [32, 32], phenotype: [120, 40], submap: [120, 64], compartment: [400, 320],
-               process: [18, 18], 'omitted process': [18, 18], 'uncertain process': [18, 18] };   // a process: our yEd maps' 18
+               process: [18, 18], 'omitted process': [18, 18], 'uncertain process': [18, 18],   // a process: our yEd maps' 18
+               and: [30, 30], or: [30, 30], not: [30, 30], equivalence: [30, 30], delay: [30, 30],   // a gate: our yEd maps' 30 (yed.graphml's Operator)
+               'biological activity': [80, 40] };   // every activity a protein's size, whatever its unit (user, 2026-11-15: "All activities should have the same size, 80 by 40")
   function cfgOf(r) { return r.localName === 'GroupNode' ? 'Compartment' : (r.getAttribute('configuration') || '').replace('com.yworks.sbgn.', ''); }
   function classOfCfg(cfg) { var c = null; Object.keys(MAKE).forEach(function (k) { if (!c && MAKE[k] === cfg) c = k; }); return c; }
   function classOfR(r) {   // the class a realizer of the editor's GraphML stands for: a process's by its sign
     var cfg = cfgOf(r);
-    if (cfg !== 'Process') return classOfCfg(cfg);
+    if (cfg !== 'Process' && cfg !== 'Operator') return classOfCfg(cfg);
     var l = kids(r, 'NodeLabel').filter(function (x) { return !x.getAttribute('iconData'); })[0], t = l ? ownText(l).trim() : '';
+    if (cfg === 'Operator') return Object.keys(GATE).filter(function (k) { return GATE[k] === t || GATE[k] === t.toUpperCase(); })[0] || null;   // tau as it is (its upper case is another letter)
     return Object.keys(SIGN).filter(function (k) { return SIGN[k] === t; })[0] || 'process';
   }
-  var NAMED = /^(macromolecule|simple chemical|nucleic acid feature|unspecified entity|perturbing agent|phenotype|complex|submap|compartment)( multimer)?$/;   // names kept in step both ways
+  var NAMED = /^(macromolecule|simple chemical|nucleic acid feature|unspecified entity|perturbing agent|phenotype|complex|submap|compartment)( multimer)?$|^biological activity$/;   // names kept in step both ways
   function ownText(el) { var t = ''; for (var c = el.firstChild; c; c = c.nextSibling) if (c.nodeType === 3 || c.nodeType === 4) t += c.nodeValue; return t; }
   function labelBox(text, w, h, k) {   // graphml._label: the label's box estimated and centred
     var lines = text ? text.split('\n') : [], n = 0;
@@ -721,6 +775,12 @@
       label = '<y:NodeLabel alignment="center" autoSizePolicy="content" bottomInset="0" fontFamily="Dialog" fontSize="14" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" hasText="' + (pt ? 'true' : 'false') + '" height="' + repr(pb[1]) +
         '" horizontalTextPosition="center" iconTextGap="4" leftInset="0" modelName="custom" rightInset="0" textColor="#000000" topInset="0" verticalTextPosition="center" visible="true" width="' + repr(pb[0]) + '" x="' + repr(pb[2]) + '" y="' + repr(pb[3]) + '">' + esc(pt) + LM +
         '<y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>';
+    } else if (GATES.test(o.cls)) {   // yed.graphml's Operator: AND, OR, NOT at the template's 12 (the map's font where it is not 14), the box at the
+      // map's font; the equivalence's sign in Monospaced 18, as graphml.write draws yEd's palette's
+      var gt = GATE[o.cls], eq = /^(equivalence|delay)$/.test(o.cls), gb = labelBox(gt, w, h, fs / 14);
+      label = '<y:NodeLabel alignment="center" autoSizePolicy="content" bottomInset="0" fontFamily="' + (eq ? 'Monospaced' : 'Dialog') + '" fontSize="' + (eq ? 18 : fs !== 14 ? fs : 12) + '" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="' + repr(gb[1]) +
+        '" horizontalTextPosition="center" iconTextGap="4" leftInset="0" modelName="custom" rightInset="0" textColor="#000000" topInset="0" verticalTextPosition="center" visible="true" width="' + repr(gb[0]) + '" x="' + repr(gb[2]) + '" xml:space="preserve" y="' + repr(gb[3]) + '" hasText="true">' + esc(gt) + LM +
+        '<y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>';
     } else label = mainLabel(o.label || '', w, h, fs);
     var round = o.cls === 'macromolecule' || o.cls === 'nucleic acid feature';   // the templates with yEd's radius 10
     return '<node id="' + esc(o.id) + '"><data key="ng">\n        <y:GenericNode configuration="com.yworks.sbgn.' + MAKE[o.cls] + '">\n' +
@@ -731,7 +791,8 @@
         (o.multimer ? MCOUNT : '') + '</y:StyleProperties>\n' : '') +   // the other templates have none
       '        </y:GenericNode>\n      </data>\n    </node>';
   }
-  function add(t, o, opt) {
+  function add(t, o, opt) {   // o.activity: an Activity Flow activity with that unit ('' none), the node its entity's (activity())
+    if (o.activity != null) return activity(add(t, Object.assign({}, o, { activity: null, cls: actCls(o.activity) }), opt), o.id, o.activity, opt);
     if (!MAKE[o.cls]) throw new Error('cannot make a ' + o.cls);
     var svs = [];
     var mac = o.cls === 'macromolecule', naf = o.cls === 'nucleic acid feature';   // the house profile: state variables on macromolecules only, units of information on them and on nucleic acid features
@@ -823,7 +884,11 @@
   function defaults(t, opt, cls) {
     cls = cls || 'macromolecule';
     var S = sbgn(t, opt), hs = [], best = null, n = 0, same = {};
-    Object.keys(S.glyph).forEach(function (id) { var c = S.glyph[id].el.getAttribute('class'); if (c === 'macromolecule') hs.push(S.glyph[id].box[3]); if (c === cls) same[id] = 1; });
+    Object.keys(S.glyph).forEach(function (id) {   // a protein's activity is a protein to the converter (sbgnml.ACTIVITY)
+      var c = S.glyph[id].el.getAttribute('class');
+      if (c === 'macromolecule' || (c === 'biological activity' && actCls(fileUnit(S.glyph[id].el)) === 'macromolecule')) hs.push(S.glyph[id].box[3]);
+      if (c === cls) same[id] = 1;
+    });
     hs.sort(function (a, b) { return a - b; });
     var m = hs.length ? (hs.length % 2 ? hs[(hs.length - 1) / 2] : (hs[hs.length / 2 - 1] + hs[hs.length / 2]) / 2) : 40, s = m / 40;   // the map's scale from its proteins, as style.scale_of
     if (!(s > 1.2 || s < 1 / 1.2)) s = 1;
@@ -1074,6 +1139,10 @@
   // a process made another kind (user, 2026-11-14: the right-click menu's Make process, Make omitted process, Make
   // uncertain process): its sign written as its label, as graphml.write writes it
   function kind(t, id, cls, opt) {   // the sign at the template's 14 (graphml.write sets no font on a sign), its box at the map's font
+    if (/^(and|or|not)$/.test(cls)) {   // a gate made another (user, 2026-11-15): AND, OR, NOT; the equivalence keeps its own rules (entities only)
+      var Gg = gml(t, opt), ng = Gg.node[id], ins = Object.keys(Gg.edge).filter(function (k) { return Gg.edge[k].t === id; }).length;
+      return ng && /^(and|or|not)$/.test(classOfR(ng.geo.parentNode) || '') && !(cls === 'not' && ins > 1) ? label(t, id, GATE[cls], opt) : t;   // a NOT has one input (the review)
+    }
     if (!PROC.test(cls)) return t;
     var G0 = gml(t, opt), n0 = G0.node[id];   // never an association or dissociation (the node property SBGN class): not one of ours to change
     if (!n0 || kids(n0.el, 'data').some(function (d) { return /^(association|dissociation)$/.test(ownText(d).trim()); })) return t;
@@ -1090,6 +1159,10 @@
   // graphml.py's ARROW (its master), by SBGN class
   var ARROW = { consumption: 'none', production: 'delta', catalysis: 'white_circle', inhibition: 't_shape', modulation: 'white_diamond',
                 stimulation: 'white_delta', 'necessary stimulation': 'white_delta_bar', 'logic arc': 'none' };
+  // Activity Flow's influences, drawn with the arrowheads of the modulations they read as (sbgnml.HEAD); after them, so
+  // an arrowhead reads back as the PD class (headClass), named again by AF_ARC where the map is Activity Flow
+  var AF_ARC = { stimulation: 'positive influence', inhibition: 'negative influence', modulation: 'unknown influence' }, PD_ARC = {};
+  Object.keys(AF_ARC).forEach(function (k) { PD_ARC[AF_ARC[k]] = k; ARROW[AF_ARC[k]] = ARROW[k]; });
   function edgeXml(id, s, t, off, head, pts, ind) {   // graphml.write's edge (pretty printed as lxml writes it)
     var i1 = ind + '  ', i2 = i1 + '  ', i3 = i2 + '  ';
     return '<edge id="' + esc(id) + '" source="' + esc(s) + '" target="' + esc(t) + '">\n' + i1 + '<data key="eg">\n' + i2 + '<y:PolyLineEdge>\n' + i3 +
@@ -1129,7 +1202,10 @@
       pin = o(fp[k0 ? k0 - 1 : 0]); pout = o(fp[k0 === 2 ? 0 : 1]);
     }
     if (!pin && !pout && toward) {
-      var dx = toward[0] - c[0], dy = toward[1] - c[1], hz = Math.abs(dx) >= Math.abs(dy), side = hz ? b[2] : b[3], r = side / 2 + Math.max(side / 2, 9);
+      var dx = toward[0] - c[0], dy = toward[1] - c[1], hz = Math.abs(dx) >= Math.abs(dy);
+      // a modulation drawn to the bare process first (user, 2026-11-15) holds a side: the antennas go along the other axis
+      if (heldAxis(G, pid) === hz) hz = !hz;
+      var side = hz ? b[2] : b[3], r = side / 2 + Math.max(side / 2, 9);
       var p = hz ? [(dx >= 0 ? 1 : -1) * r, 0] : [0, (dy >= 0 ? 1 : -1) * r];
       if (asIn) pin = p; else pout = p;
     }
@@ -1138,17 +1214,89 @@
     var r4 = function (v) { return v && [Math.round((c[0] + v[0]) * 10000) / 10000 - c[0], Math.round((c[1] + v[1]) * 10000) / 10000 - c[1]]; };   // as write() puts the port in the file: the offset the converter reads back
     return [r4(pin), r4(pout)];
   }
-  // an arc from glyph s to glyph t (a consumption: an entity to a process; a production: a process to an entity), id
-  // given; the process end on its port, the entity end at its centre; opt.sbgn, the SBGN-ML text: a process's own ports
-  var sLast = [null, null];
+  // the axis the modulations of process pid hold (true: they come in on the left or right), null when they hold none or
+  // both: each modulation's end, or where it comes from when its end is at the centre
+  function heldAxis(G, pid) {
+    var c = centre(G.node[pid].box), held = Object.keys(G.edge).map(function (k) { return G.edge[k]; }).filter(function (e) { return e.t === pid && G.node[e.s] && MODS.test(headClass(headOf(e)) || ''); }).map(function (e) {
+      if (Math.abs(e.off[2]) > 1e-9 || Math.abs(e.off[3]) > 1e-9) return Math.abs(e.off[2]) >= Math.abs(e.off[3]);
+      var f = centre(G.node[e.s].box); return Math.abs(f[0] - c[0]) >= Math.abs(f[1] - c[1]);
+    });
+    return held.length && held.every(function (h) { return h === held[0]; }) ? held[0] : null;
+  }
+  // an arc from glyph s to glyph t, id given (user, 2026-11-15: the modulations and the logic gates added): a consumption
+  // from an entity into a process, a production from a process to an entity, a logic arc into a gate (from an entity, or a
+  // gate's port out) or out of an equivalence to an entity, a modulation (catalysis, stimulation, inhibition, necessary
+  // stimulation, modulation) from an entity or a gate's port out to a process or a phenotype. An end at a process or gate
+  // on its port (the axis guessed by the first arc, re-guessed by the second), a modulation's end at a process the middle of
+  // the side off its antennas that faces where it comes from, an entity's end at its centre. opt.sbgn, the SBGN-ML text: a
+  // process's own ports
+  var sLast = [null, null], MODS = /^(catalysis|stimulation|inhibition|modulation|necessary stimulation)$/;
   function connect(t, id, s, tg, cls, opt) {
     var G = gml(t, opt);
     if (!G.node[s] || !G.node[tg] || !ARROW[cls]) return t;
-    var off = [0, 0, 0, 0], hub = function (x) { return /\.(Process|Operator)$/.test(G.node[x].geo.parentNode.getAttribute('configuration') || ''); };
+    var off = [0, 0, 0, 0], cfg = function (x) { return G.node[x].geo.parentNode.getAttribute('configuration') || ''; };
+    var hub = function (x) { return /\.(Process|Operator)$/.test(cfg(x)); };
     var S = opt && opt.sbgn ? (sLast[0] === opt.sbgn ? sLast[1] : (sLast = [opt.sbgn, sbgn(opt.sbgn, opt)])[1]) : null;   // read once for the arcs of one step (only read, never edited)
-    if (cls === 'consumption' && hub(tg)) { var pi = hubPorts(G, tg, centre(G.node[s].box), true, S)[0]; off[2] = pi[0]; off[3] = pi[1]; }
-    else if (cls === 'production' && hub(s)) { var po = hubPorts(G, s, centre(G.node[tg].box), false, S)[1]; off[0] = po[0]; off[1] = po[1]; }
+    var own = function (x) { return !!(S && S.glyph[x] && kids(S.glyph[x].el, 'port').length >= 2); };
+    // the hub ends on their ports: the source's port out (a production, a gate's output), the target's port in (a
+    // consumption, a gate's input)
+    [[s, tg, false, cls === 'production' || cls === 'logic arc' || MODS.test(cls)], [tg, s, true, cls === 'consumption' || cls === 'logic arc']].forEach(function (q) {
+      var pid = q[0], other = q[1], asIn = q[2];
+      if (!q[3] || !hub(pid)) return;
+      var re = !own(pid) ? reguess(t, G, pid, other, asIn) : null;   // a process or gate without the file's own ports
+      if (re) { t = re; G = gml(t, opt); }
+      var pp = hubPorts(G, pid, centre(G.node[other].box), asIn, S);
+      if (asIn) { off[2] = pp[0][0]; off[3] = pp[0][1]; } else { off[0] = pp[1][0]; off[1] = pp[1][1]; }
+    });
+    if (MODS.test(cls) && /\.Process$/.test(cfg(tg))) {   // a modulation at a process: the middle of a side off the antennas
+      var b = G.node[tg].box, c = centre(b), from = centre(G.node[s].box);
+      from = [from[0] + off[0], from[1] + off[1]];
+      var pp2 = hubPorts(G, tg, null, true, S), ax = pp2[0] ? (Math.abs(pp2[0][0]) >= Math.abs(pp2[0][1]) ? 'h' : 'v') : null;
+      var dx = from[0] - c[0], dy = from[1] - c[1], vert = ax ? ax === 'h' : Math.abs(dy) > Math.abs(dx);   // on the top or bottom side
+      var v = vert ? [0, (dy >= 0 ? 1 : -1) * b[3] / 2] : [(dx >= 0 ? 1 : -1) * b[2] / 2, 0];
+      var u = [from[0] - c[0], from[1] - c[1]], n = Math.hypot(u[0], u[1]);
+      if (n && Math.abs(u[0] * v[1] - u[1] * v[0]) / n <= 1.5 && u[0] * v[0] + u[1] * v[1] >= 0) v = [0, 0];   // on the line to the centre: read so by the converter (sbgnml.at)
+      else v = [Math.round((c[0] + v[0]) * 10000) / 10000 - c[0], Math.round((c[1] + v[1]) * 10000) / 10000 - c[1]];   // as write() puts it in the file
+      off[2] = v[0]; off[3] = v[1];
+    }
     return edgesIn(t, G, [[id, s, tg, off, ARROW[cls], []]]);
+  }
+  // the second link re-guesses the axis (user, 2026-11-15: "as soon as the second link is added, this guess should be
+  // changed to ... accommodate more information from first link and from the second link"; "if people do something
+  // manually ... it should stick"): a process with one consumption or production whose port still lies on the side the
+  // first arc's guess gives (so not turned by hand, nor a file's own placing) is set again along the pull of both ends,
+  // from the mean of what goes in to the mean of what comes out, the nearer of horizontal or vertical; the first arc's
+  // end moved to its new port. The text with that change, or null when nothing is re-guessed
+  function reguess(t, G, pid, other, asIn) {
+    var gate = /\.Operator$/.test(G.node[pid].geo.parentNode.getAttribute('configuration') || '');   // a gate's output: any arc out of it
+    var flux = Object.keys(G.edge).map(function (k) { return G.edge[k]; }).filter(function (e) {
+      return (e.t === pid && headOf(e) === 'none') || (e.s === pid && (gate || headOf(e) === 'delta'));
+    });
+    if (flux.length !== 1) return null;
+    var e = flux[0], eIn = e.t === pid, o = eIn ? [e.off[2], e.off[3]] : [e.off[0], e.off[1]], b = G.node[pid].box, c = centre(b);
+    if (Math.abs(o[0]) < 1e-9 && Math.abs(o[1]) < 1e-9) return null;   // at the centre: the file's own ports, kept
+    var far = centre(G.node[eIn ? e.s : e.t].box), side = function (v) { return Math.abs(v[0]) >= Math.abs(v[1]) ? (v[0] >= 0 ? 'E' : 'W') : (v[1] >= 0 ? 'S' : 'N'); };
+    if (side(o) !== side([far[0] - c[0], far[1] - c[1]])) return null;   // turned by hand, or placed so by the file: kept
+    if (eIn === asIn) return null;   // one in and one out only: two of a kind keep the first guess (the review: two productions turned across their flow)
+    var A = eIn ? far : centre(G.node[other].box), B = eIn ? centre(G.node[other].box) : far, dx = B[0] - A[0], dy = B[1] - A[1];
+    if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) return null;
+    var hz = Math.abs(dx) >= Math.abs(dy), k = (hz ? dx : dy) >= 0 ? 1 : -1, r = (hz ? b[2] : b[3]) / 2 + Math.max((hz ? b[2] : b[3]) / 2, 9);
+    if (!gate && heldAxis(G, pid) === hz) return null;   // the antennas never onto a side a modulation holds (the review)
+    var pout = hz ? [k * r, 0] : [0, k * r], want = eIn ? [-pout[0], -pout[1]] : pout;
+    want = [Math.round((c[0] + want[0]) * 10000) / 10000 - c[0], Math.round((c[1] + want[1]) * 10000) / 10000 - c[1]];   // as hubPorts rounds
+    if (Math.abs(want[0] - o[0]) < 1e-6 && Math.abs(want[1] - o[1]) < 1e-6) return null;
+    var T = new Tags(t, G.doc), a = eIn ? ['tx', 'ty'] : ['sx', 'sy'];
+    T.set(e.path, a[0], repr(want[0])); T.set(e.path, a[1], repr(want[1]));
+    if ((Math.abs(o[0]) >= Math.abs(o[1])) !== hz) Object.keys(G.edge).forEach(function (k) {   // the axis turned a quarter: a modifier's end on a side off the antennas turned with it, as Turn process does (the review)
+      var m = G.edge[k];
+      if (m === e) return;
+      [[m.t === pid, 2, ['tx', 'ty']], [m.s === pid, 0, ['sx', 'sy']]].forEach(function (q) {
+        var x = m.off[q[1]], y = m.off[q[1] + 1];
+        if (!q[0] || (Math.abs(x) < 1e-9 && Math.abs(y) < 1e-9)) return;
+        T.set(m.path, q[2][0], repr(-y)); T.set(m.path, q[2][1], repr(x));
+      });
+    });
+    return T.text();
   }
   function arcRemove(t, ids, opt) {   // arcs deleted in the editor's GraphML; their ids kept for write()
     var G = gml(t, opt), T = new Tags(t, G.doc), del = [];
@@ -1156,18 +1304,129 @@
     return del.length ? goneMark(T.text(), del) : t;
   }
   function arcClass(G, e, S) {   // the SBGN class of an edge the editor made: its arrowhead; the bare line a consumption, a logic arc into a gate
-    var h = headOf(e), cls = Object.keys(ARROW).filter(function (k) { return ARROW[k] === h; })[0] || null;
-    if (h !== 'none') return cls;
-    var tc = S && S.glyph[e.t] ? S.glyph[e.t].el.getAttribute('class') || '' : '';
-    return /^(and|or|not|equivalence)$/.test(tc) ? 'logic arc' : 'consumption';
+    var h = headOf(e);
+    if (h !== 'none') return headClass(h);
+    var tc = S && S.glyph[e.t] ? S.glyph[e.t].el.getAttribute('class') || '' : '', sc = S && S.glyph[e.s] ? S.glyph[e.s].el.getAttribute('class') || '' : '';
+    return GATES.test(tc) || sc === 'equivalence' ? 'logic arc' : 'consumption';   // into a gate, or out of an equivalence to its entity
+  }
+  function headClass(h) { return h === 'none' ? null : Object.keys(ARROW).filter(function (k) { return ARROW[k] === h; })[0] || null; }
+  // a modulation made another (user, 2026-11-15: the right-click menu over an arc): its arrowhead in the editor's GraphML;
+  // write() sets the file's class from it, graphml() the arrowhead from the file's
+  function arcKind(t, id, cls, opt) {
+    var G = gml(t, opt), e = G.edge[id];
+    if (!e || !MODS.test(cls) || !MODS.test(headClass(headOf(e)) || '')) return t;
+    var ar = e.el.getElementsByTagNameNS(YNS, 'Arrows')[0];
+    if (!ar || ar.getAttribute('target') === ARROW[cls]) return t;
+    var T = new Tags(t, G.doc); T.set(ar, 'target', ARROW[cls]); return T.text();
   }
   function classOf(t, id, opt) { var g = sbgn(t, opt).glyph[id]; return g ? g.el.getAttribute('class') || '' : ''; }
   function nameable(t, id, opt) { var g = sbgn(t, opt).glyph[id]; return !!g && NAMED.test(g.el.getAttribute('class') || ''); }   // a name the editor may change: one write() carries
   function svText(value, variable) { return (value || '') + (variable ? '@' + variable : ''); }
-  var HUB = /process|^(and|or|not|association|dissociation|equivalence)$/;
+  var HUB = /process|^(and|or|not|association|dissociation|equivalence|delay)$/;
+
+  // ---------- Activity Flow (user, 2026-11-15: an AF map "saved as clean SBGN Activity Flow" whichever view it is drawn in) ----------
+  // An activity is the node of its entity, as the converter draws it (CellDesigner's way; sbgnml.ACTIVITY the master: no
+  // unit a protein's, "if there is no auxiliary unit, it's a protein activity"), with the node properties "SBGN class"
+  // biological activity and "SBGN unit" its unit's entity, if any, as sbgnml.read keeps them. write() writes a node so
+  // marked as a biological activity whose unit of information holds only its entity, no text (user: "nothing should be
+  // written in it ... The actual name goes into the large box"), and the influences under AF's names, on a map that is
+  // Activity Flow: its file says so, or it was empty and an activity was drawn on it (then marked so). Elsewhere (a PD or
+  // hybrid map) the node is written as its entity, as before.
+  //   activity(g, id, unit) -> g with the node an activity of that unit ('' none): yEd's shape of the entity, the properties
+  //   activities(g) -> { node id: unit } of the activities; afUnitBox(box, unit) -> the unit's box, drawn and written alike
+  var UNIT_CLS = { '': 'macromolecule', macromolecule: 'macromolecule', 'simple chemical': 'simple chemical', 'nucleic acid feature': 'nucleic acid feature',
+                   complex: 'complex', 'unspecified entity': 'unspecified entity', perturbation: 'phenotype' };   // the unit's entity -> the class drawn (sbgnml.ACTIVITY)
+  function actCls(unit) { return UNIT_CLS[(unit || '').replace(/ multimer$/, '')] || 'macromolecule'; }   // an unknown entity: a protein's, as the converter reads it
+  function nameIn(el) {   // a glyph's name as sbgnml.read reads it: an activity's without "activity" at its end (user, 2026-10-19: "SHC activity" is SHC)
+    var lab = kid(el, 'label'), x = lab ? lab.getAttribute('text') || '' : '';
+    return el.getAttribute('class') === 'biological activity' && /\sactivity\s*$/i.test(x) ? x.replace(/\s+activity\s*$/i, '') : x;
+  }
+  function fileUnit(el) {   // sbgnml.read: the entity of a biological activity's first unit of information, '' for none
+    var u = kids(el, 'glyph').filter(function (c) { return c.getAttribute('class') === 'unit of information'; })[0], e = u && kid(u, 'entity');
+    return e ? e.getAttribute('name') || '' : '';
+  }
+  function keyOf(G, name) {   // the id of the node property's key, or null
+    if (!G.K) { G.K = {}; kids(G.doc.documentElement, 'key').forEach(function (k) { if (k.getAttribute('for') === 'node' && k.getAttribute('attr.name')) G.K[k.getAttribute('attr.name')] = k.getAttribute('id'); }); }
+    return G.K[name] || null;
+  }
+  function propEl(G, id, name) { var k = keyOf(G, name), n = G.node[id]; return k && n ? kids(n.el, 'data').filter(function (d) { return d.getAttribute('key') === k; })[0] || null : null; }
+  function actOf(G, id) {   // the unit of the activity id ('' none), or null: not an activity
+    var c = propEl(G, id, 'SBGN class');
+    if (!c || ownText(c).trim() !== 'biological activity') return null;
+    var u = propEl(G, id, 'SBGN unit');
+    return u ? ownText(u).trim() : '';
+  }
+  function activities(t, opt) { var G = gml(t, opt), out = {}; G.ids.forEach(function (id) { var u = actOf(G, id); if (u != null) out[id] = u; }); return out; }
+  function setProps(t, id, P, opt) {   // the node's properties (name -> text, null: none), their keys declared where missing, as graphml.write writes them
+    var G = gml(t, opt), n = G.node[id];
+    if (!n) return t;
+    var T = new Tags(t, G.doc), keys = kids(G.doc.documentElement, 'key'), taken = keys.map(function (k) { return k.getAttribute('id'); }), decl = '', ins = '';
+    Object.keys(P).forEach(function (name) {
+      var k = keyOf(G, name), d = propEl(G, id, name), v = P[name];
+      if (d) {
+        if (v == null) T.cut(d);
+        else if (ownText(d).trim() !== v) { var s = T.at.get(d); T.ed.push([s[0], T.end(d), '<data key="' + esc(k) + '">' + esc(v) + '</data>']); }
+        return;
+      }
+      if (v == null) return;
+      if (!k) {
+        for (var j = 0; taken.indexOf('d' + j) >= 0; j++);
+        k = 'd' + j; taken.push(k);
+        decl += '<key attr.name="' + esc(name) + '" attr.type="string" for="node" id="' + k + '"/>\n' + (keys.length ? T.indent(keys[0]) : '  ');
+      }
+      ins += '<data key="' + k + '">' + esc(v) + '</data>';
+    });
+    if (decl) { var at0 = keys.length ? T.at.get(keys[0])[0] : T.at.get(kids(G.doc.documentElement, 'graph')[0])[0]; T.ed.push([at0, at0, decl]); }
+    if (ins) { var e0 = T.at.get(n.el)[1]; T.ed.push([e0, e0, ins]); }
+    return T.text();
+  }
+  var RADIUS = '<y:Property class="java.lang.Integer" name="com.yworks.sbgn.style.radius" value="10"/>';
+  function activity(t, id, unit, opt) {
+    var G = gml(t, opt), n = G.node[id], cls = actCls(unit);
+    if (!n || n.el.getAttribute('yfiles.foldertype')) return t;   // a complex with members: not an activity of AF
+    var r = n.geo.parentNode;
+    if (cfgOf(r) !== MAKE[cls]) {   // drawn as its entity (the CellDesigner view): yEd's shape, rounded as the templates of a protein and a nucleic acid feature
+      var T = new Tags(t, G.doc), sp = kid(r, 'StyleProperties'), rad = sp && kids(sp, 'Property').filter(function (p) { return p.getAttribute('name') === 'com.yworks.sbgn.style.radius'; })[0];
+      var round = cls === 'macromolecule' || cls === 'nucleic acid feature';
+      T.set(r, 'configuration', 'com.yworks.sbgn.' + MAKE[cls]);
+      if (rad && !round) T.cut(kids(sp, 'Property').length > 1 ? rad : sp);
+      if (!rad && round) {
+        if (sp) { var s = T.at.get(sp); if (s[2]) T.ed.push([s[0], s[1], '<y:StyleProperties>' + RADIUS + '</y:StyleProperties>']); else { var c = T.t.lastIndexOf('</', T.end(sp) - 1); T.ed.push([c, c, RADIUS]); } }
+        else { var c2 = T.t.lastIndexOf('</', T.end(r) - 1); T.ed.push([c2, c2, '<y:StyleProperties>' + RADIUS + '</y:StyleProperties>']); }
+      }
+      t = T.text();
+    }
+    return setProps(t, id, { 'SBGN class': 'biological activity', 'SBGN unit': unit || null }, opt);
+  }
+  // the unit's box (user, 2026-11-15: small, at the top right, "1 to 2 to 1 for protein and 1 by 1 for metabolite"): 0.3
+  // of the activity's height (12 at 80 by 40), twice as wide, a simple chemical's as wide as high, centred on the top
+  // edge, its inset from the right side a tenth of the width (at least 4)
+  function afUnitBox(b, unit) {
+    if (!unit) return null;
+    var h = b[3] * 0.3, w = actCls(unit) === 'simple chemical' ? h : 2 * h;
+    return [b[0] + b[2] - w - Math.max(4, b[2] * 0.1), b[1] - h / 2, w, h];
+  }
+  // the map is Activity Flow: its file says so (its language, or SBGN-ML 0.3's version), or the file holds nothing but
+  // compartments and the drawing an activity and no process (user: "an empty map on which AF things are drawn becomes AF")
+  function isAf(t) {
+    var m = (t || '').slice(0, 3000).match(/<(\w+:)?map\b[^>]*>/);
+    return !!m && (/\blanguage=["']activity flow["']/.test(m[0]) || /\bversion=["'][^"']*sbgn\.af\./.test(m[0]));
+  }
+  function afNow(t, S, G) {
+    if (isAf(t)) return true;
+    if (Object.keys(S.glyph).some(function (id) { return S.glyph[id].el.getAttribute('class') !== 'compartment'; })) return false;
+    return G.ids.some(function (id) { return actOf(G, id) != null; }) && !G.ids.some(function (id) { return cfgOf(G.node[id].geo.parentNode) === 'Process'; });
+  }
+  function afLanguage(t) {   // the map marked Activity Flow: its language, and a version naming PD
+    return t.replace(/<(\w+:)?map\b[^>]*>/, function (tag) {
+      tag = /\slanguage\s*=/.test(tag) ? tag.replace(/(\slanguage\s*=\s*)("[^"]*"|'[^']*')/, '$1"activity flow"') : tag.replace(/(\/?>)$/, ' language="activity flow"$1');
+      return tag.replace(/(\sversion\s*=\s*["'][^"']*sbgn\.)pd\./, '$1af.');
+    });
+  }
 
   var api = { graphml: graphml, write: write, defaults: defaults, add: add, lookOf: lookOf, restyle: restyle, label: label, state: state, stateValue: stateValue, stateMove: stateMove, stateDelete: stateDelete,
               unit: unit, unitValue: unitValue, unitDelete: unitDelete, multimer: multimer, classOf: classOf, MAKE: MAKE, kind: kind, PROCESSES: ['process'].concat(Object.keys(SIGN)), SIGN: SIGN, remove: remove, resize: resize, gone: gone, nameable: nameable,
-              connect: connect, arcRemove: arcRemove };
+              connect: connect, arcRemove: arcRemove, arcKind: arcKind, GATE: GATE, ARROW: ARROW, MODULATIONS: ['stimulation', 'catalysis', 'inhibition', 'necessary stimulation', 'modulation'],
+              activity: activity, activities: activities, afUnitBox: afUnitBox, isAf: isAf, AF_ARC: AF_ARC, UNITS: Object.keys(UNIT_CLS).filter(function (u) { return u && u !== 'perturbation'; }), unitClass: actCls };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.sbgn_edit = api;
 })(typeof self !== 'undefined' ? self : this);

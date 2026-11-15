@@ -19,11 +19,17 @@
     // SBGN card without asking): each made empty at its size (sbgn_edit SIZE), named by a double click (not the empty
     // set); a nucleic acid feature takes units of information from its right-click menu, ct:mRNA and ct:gene offered;
     // a complex is made empty, beside others (members later); a compartment lies under what is there, its border 2
-    var PAL = [   // groups named and ordered as SBGN's PD reference card (user, 2026-11-15; the card: viewer-source notes/references/);
+    var PRESET = { 'nucleic acid feature ct:gene': ['nucleic acid feature', ['ct:gene']], 'nucleic acid feature ct:mRNA': ['nucleic acid feature', ['ct:mRNA']] };
+    function baseKind(k) { return PRESET[k] ? PRESET[k][0] : k; }
+    var PAL_PD = [   // groups named and ordered as SBGN's PD reference card (user, 2026-11-15; the card: viewer-source notes/references/);
       // each sign fills the 24-unit box as far as the tools' own signs do (user: the palette's looked small beside "?")
       ['Entity pool nodes', [['macromolecule', 'Macromolecule', '<rect x="1.5" y="5" width="21" height="14" rx="3.5"/>'],
         ['simple chemical', 'Simple chemical', '<circle cx="12" cy="12" r="7"/>'],   // as tall as the macromolecule's sign (user, 2026-11-14)
-        ['nucleic acid feature', 'Nucleic acid feature', '<path d="M1.5 5h21v9.5q0 4.5-4.5 4.5h-12q-4.5 0-4.5-4.5z"/>'],
+        // two presets in place of the bare one (user, 2026-11-15: "for compatibility sake ... conceptual type gene,
+        // conceptual type mRNA. So it is always clear"; CellDesigner has a gene and an RNA, no nucleic acid feature): each
+        // made with its unit of information (PRESET), which can be retyped or deleted as any other
+        ['nucleic acid feature ct:gene', 'Nucleic acid feature, ct:gene', '<path d="M1.5 5h21v9.5q0 4.5-4.5 4.5h-12q-4.5 0-4.5-4.5z"/><text x="12" y="14.6" text-anchor="middle" font-size="7">gene</text>'],
+        ['nucleic acid feature ct:mRNA', 'Nucleic acid feature, ct:mRNA', '<path d="M1.5 5h21v9.5q0 4.5-4.5 4.5h-12q-4.5 0-4.5-4.5z"/><text x="12" y="14.6" text-anchor="middle" font-size="6.4">mRNA</text>'],
         ['unspecified entity', 'Unspecified entity', '<ellipse cx="12" cy="12" rx="10.5" ry="7"/>'],
         ['complex', 'Complex', '<path d="M6 4h12l4 4v8l-4 4h-12l-4-4v-8z"/>'],
         ['perturbing agent', 'Perturbing agent', '<path d="M1.5 5h21l-3.5 7 3.5 7h-21l3.5-7z"/>'],
@@ -31,32 +37,223 @@
       // processes (user, 2026-11-14: "process, omitted, uncertain"; no association or dissociation, by choice): a bare
       // square, its antennas grown by its first arc; the other kinds from its right-click menu too
       ['Process nodes', [['process', 'Process', '<rect x="5" y="5" width="14" height="14"/>'],
-        ['omitted process', 'Omitted process', '<rect x="5" y="5" width="14" height="14"/><path d="M9 15l2.5-6M12.5 15l2.5-6"/>'],
-        ['uncertain process', 'Uncertain process', '<rect x="5" y="5" width="14" height="14"/><path d="M9.8 10.2a2.2 2.2 0 1 1 3.2 2c-.7.4-1 .8-1 1.6M12 16.3v.4"/>'],
+        ['omitted process', 'Omitted process', '<rect x="5" y="5" width="14" height="14"/><path d="M9 15l2.5-6M12.5 15l2.5-6" class="in"/>'],
+        ['uncertain process', 'Uncertain process', '<rect x="5" y="5" width="14" height="14"/><path d="M9.8 10.2a2.2 2.2 0 1 1 3.2 2c-.7.4-1 .8-1 1.6" class="in"/><circle class="dot" cx="12" cy="16.4" r=".8"/>'],
         ['phenotype', 'Phenotype', '<path d="M6 5h12l4.5 7-4.5 7h-12l-4.5-7z"/>']]],
-      ['Container nodes', [['compartment', 'Compartment', '<rect x="1.5" y="3" width="21" height="18" rx="4.5" stroke-width="2.2"/>']]],
-      ['Encapsulation node', [['submap', 'Submap', '<rect x="1.5" y="4" width="21" height="16"/>']]],
+      // the card's one-sign sections (Container Nodes, Encapsulation Node) joined, as Newt's Other nodes (user, 2026-11-15:
+      // one sign under a group is not nice)
+      ['Other nodes', [['compartment', 'Compartment', '<rect x="1.5" y="3" width="21" height="18" rx="4.5" stroke-width="2.2"/>'],
+        ['submap', 'Submap', '<rect x="1.5" y="4" width="21" height="16"/>']]],
       // arcs (user, 2026-11-15: "Now add connectors"; notes/process-glyph.md step 2): drawn by a drag from a node, the kind
       // guessed from its two ends; a sign picked is used as it is
       ['Connecting arcs', [['consumption', 'Consumption', '<path d="M3 12h18"/>'],
-        ['production', 'Production', '<path d="M3 12h11"/><path d="M13 7.5l8 4.5-8 4.5z" fill="currentColor"/>']]]
+        ['production', 'Production', '<path d="M3 12h11"/><path d="M13 7.5l8 4.5-8 4.5z" fill="currentColor"/>'],
+        // the modulations (user, 2026-11-15: "let's add missing arrowheads, like modulation, and the rest"), the card's order
+        ['modulation', 'Modulation', '<path d="M3 12h10"/><path d="M13 12l4-4 4 4-4 4z"/>'],
+        ['stimulation', 'Stimulation', '<path d="M3 12h10"/><path d="M13 7.5l8 4.5-8 4.5z"/>'],
+        ['catalysis', 'Catalysis', '<path d="M3 12h12"/><circle cx="18" cy="12" r="3"/>'],
+        ['inhibition', 'Inhibition', '<path d="M3 12h17M20 6v12"/>'],
+        ['necessary stimulation', 'Necessary stimulation', '<path d="M3 12h7M10 7v10"/><path d="M13 7.5l8 4.5-8 4.5z"/>']]],
+      // logic gates (user, 2026-11-15: "let's add logic gates, including identity gate": SBGN's equivalence operator), a
+      // circle with its word or sign, made bare as a process, its antennas grown by its arcs; marks inside a sign are class
+      // "in", a dot class "dot", letters plain <text>: their weight is the Edit window's one rule (atlas-app.html, Sign weights)
+      ['Logical operators', [['and', 'AND', '<circle cx="12" cy="12" r="10"/><text x="12" y="14.7" text-anchor="middle" font-size="7.4" letter-spacing="-.1">AND</text>'],
+        ['or', 'OR', '<circle cx="12" cy="12" r="10"/><text x="12" y="14.9" text-anchor="middle" font-size="8.2">OR</text>'],
+        ['not', 'NOT', '<circle cx="12" cy="12" r="10"/><text x="12" y="14.7" text-anchor="middle" font-size="7.4" letter-spacing="-.1">NOT</text>'],
+        ['equivalence', 'Equivalence', '<circle cx="12" cy="12" r="10"/><path d="M7.5 8.8h9M7.5 12h9M7.5 15.2h9" class="in"/>']]]
     ];
-    var ARCS = { consumption: 1, production: 1 };   // the signs that draw an arc, not a glyph
+    // Activity Flow (user, 2026-11-15: "PD, AF (reduced notation version), AF"; then two tabs, PD and AF, and under AF the
+    // view, Reduced notation (CellDesigner) or SBGN: one set of rules, two ways of drawing the nodes). The kinds are the PD
+    // ones, so a node made in either view is the same glyph in the file: an entity, drawn in the SBGN view as a biological
+    // activity (a sharp-cornered rectangle, a small unit of information at its top right, none on a protein), in the
+    // CellDesigner view as the entity itself. No processes, no empty set, no consumption or production, no catalysis (AF has
+    // none); the four influences of the AF reference card under its names; the delay (tau) added to the gates, the
+    // equivalence kept (user, 2026-11-15: AF lacks it only because its specification was not updated)
+    var PHENO = PAL_PD[1][1].filter(function (q) { return q[0] === 'phenotype'; })[0], OTHER = PAL_PD[2];
+    var GATES_PD = PAL_PD[4][1], ARC_PD = {};
+    PAL_PD[3][1].forEach(function (q) { ARC_PD[q[0]] = q; });
+    var DELAY = ['delay', 'Delay', '<circle cx="12" cy="12" r="10"/><text x="12" y="17" text-anchor="middle" font-size="14" font-family="Times New Roman, serif" fill="currentColor" stroke="none">\u03c4</text>'];
+    var INFL = [['stimulation', 'Positive influence'], ['inhibition', 'Negative influence'], ['modulation', 'Unknown influence'], ['necessary stimulation', 'Necessary stimulation']];
+    // the activities (user, 2026-11-15: "I would have clean activity without auxiliary unit and protein activity with
+    // auxiliary unit", "the same size rectangle for other types of activities like metabolite ... I would add auxiliary
+    // units for them"): Activity, a sharp rectangle with no unit (a protein's, as SBGN's AF examples), then one for each
+    // entity with its unit at the top right (sbgn_edit.afUnitBox), the protein's twice as wide as high, the metabolite's a
+    // circle; the rectangle's top edge left open under the unit, the unit an inner mark (Sign weights). ACT_UNIT: the
+    // unit each makes ('' none). The logic arc, the bare line into a gate, its own sign here (user: "you forgot logic arc
+    // ... it should be there")
+    var ACT = ['activity', 'Activity', '<rect x="1.5" y="5" width="21" height="14"/>'];
+    var ACT_UNIT = { activity: '' }, ACT_NAME = {};   // the palette's kind -> its unit, and back
+    var ACTS = [ACT].concat([['macromolecule', 'Protein activity', '<rect x="10.5" y="2.5" width="10" height="5" rx="1.6"/>', 10.5, 20.5],
+      ['simple chemical', 'Metabolite activity', '<circle cx="18" cy="5" r="2.5"/>', 15.5, 20.5],
+      ['nucleic acid feature', 'Nucleic acid feature activity', '<path d="M10.5 2.5h10v3.4q0 1.6-1.6 1.6h-6.8q-1.6 0-1.6-1.6z"/>', 10.5, 20.5],
+      ['complex', 'Complex activity', '<path d="M12 2.5h7l1.5 1.5v2l-1.5 1.5h-7l-1.5-1.5v-2z"/>', 10.5, 20.5],
+      ['unspecified entity', 'Unspecified entity activity', '<ellipse cx="15.5" cy="5" rx="5" ry="2.5"/>', 10.5, 20.5]].map(function (q) {
+      var kind = q[1].toLowerCase();
+      ACT_UNIT[kind] = q[0]; ACT_NAME[q[0]] = kind;
+      return [kind, q[1], '<path d="M' + q[3] + ' 5H1.5v14h21V5H' + q[4] + '"/><g class="in">' + q[2] + '</g>'];
+    }));
+    // the CellDesigner view's activities (user, 2026-11-15: in the CellDesigner view "it would be simple protein", in the SBGN
+    // view something else): the same kinds as ACTS, so the file is the same whichever view drew them, under CellDesigner's
+    // names and as the entity glyphs (the PD palette's signs); no bare Activity, which CellDesigner draws as a protein
+    // SBGN's names kept (user, 2026-11-15: "This whole edit thing is for SBGN ... we don't change name there"): only the
+    // signs are CellDesigner's shapes
+    var PD_SIGN = {}; PAL_PD[0][1].forEach(function (q) { PD_SIGN[q[0]] = q[2]; });
+    PD_SIGN['nucleic acid feature'] = '<path d="M1.5 5h21v9.5q0 4.5-4.5 4.5h-12q-4.5 0-4.5-4.5z"/>';
+    var ACTS_CD = ['macromolecule', 'simple chemical', 'nucleic acid feature', 'complex', 'unspecified entity'].map(function (c) {
+      var k = ACT_NAME[c]; return [k, ACTS.filter(function (q) { return q[0] === k; })[0][1], PD_SIGN[c]];
+    });
+    var PERT = ['perturbing agent', 'Perturbation', PAL_PD[0][1].filter(function (q) { return q[0] === 'perturbing agent'; })[0][2]];
+    var LOGIC = ['logic arc', 'Logic arc', '<path d="M3 12h18"/>'];
+    function palAf(sbgnLook) {
+      return [
+        ['Activity nodes', (sbgnLook ? ACTS : ACTS_CD).concat([PHENO, PERT])],
+        OTHER,
+        ['Arcs', INFL.map(function (x) { var q = ARC_PD[x[0]]; return [q[0], sbgnLook || x[0] === 'necessary stimulation' ? x[1] : q[1] + ' (' + x[1].toLowerCase() + ')', q[2]]; }).concat([LOGIC])],
+        ['Logical operators', GATES_PD.concat([DELAY])]
+      ];
+    }
+    var PALS = { pd: PAL_PD, rn: palAf(false), sbgn: palAf(true) };
+    var ARCS = {}, MODK = {};   // the signs that draw an arc, not a glyph (Connecting arcs, Modulating arcs), and among them the modulations
+    PAL_PD[3][1].forEach(function (q) { ARCS[q[0]] = 1; if (!/^(consumption|production)$/.test(q[0])) MODK[q[0]] = 1; });   // sbgn_edit loads later
+    ARCS['logic arc'] = 1;
     function arcTool() { return tool && ARCS[tool.kind] ? tool.kind : null; }
     var tool = null;   // { kind, sticky } in hand
     var pal = document.createElement('div');
     pal.className = 'm2-ed-palette'; pal.hidden = true; pal.setAttribute('role', 'toolbar'); pal.setAttribute('aria-label', 'Palette');
-    pal.innerHTML = PAL.map(function (s) {
-      var info = s[0] === 'Connecting arcs' ? ' <button type="button" class="m2-ed-pinfo" aria-label="How arcs are drawn" title="How arcs are drawn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 7v4.5M8 4.6v.4"/></svg></button>' : '';
+    // which set the palette shows (user, 2026-11-15): PD or AF, and AF's look, per map in this browser; a map not chosen yet
+    // starts on what its file is (an Activity Flow file AF in the SBGN view, else PD)
+    var PAL_KEY = 'atlas-edit-palette', palSet = { lang: 'pd', look: 'rn' };
+    function palStore() { try { return JSON.parse(localStorage.getItem(PAL_KEY)) || {}; } catch (e) { return {}; } }
+    function palId() { return site && (site.id || site.path) || name || null; }   // the map edited (V.current is the editor's own entry then)
+    function palFor() {   // the map's choice, else from its file
+      var all = palStore(), id = palId(), k = id && all[id];
+      if (k && (k.lang === 'pd' || k.lang === 'af')) return { lang: k.lang, look: k.look === 'sbgn' ? 'sbgn' : 'rn', hyb: typeof k.hyb === 'boolean' ? k.hyb : null };
+      var af = fileAf(sb && sb.base);
+      return { lang: af ? 'af' : 'pd', look: af ? 'sbgn' : 'rn', hyb: null };
+    }
+    function palKeep() { var all = palStore(), id = palId(); if (!id) return; all[id] = palSet; try { localStorage.setItem(PAL_KEY, JSON.stringify(all)); } catch (e) {} }
+    function palSigns(set) {
+      return set.map(function (s) {
+      var info = s[0] === 'Connecting arcs' || s[0] === 'Arcs' ? ' <button type="button" class="m2-ed-pinfo" aria-label="How arcs are drawn" title="How arcs are drawn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="8" cy="8" r="7.2" stroke-width="1.1"/><path d="M8 7.3v4.2" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="4.6" r="1.2" fill="currentColor" stroke="none"/></svg></button>' : '';
       return '<p>' + s[0] + info + '</p><div class="m2-ed-prow">' + s[1].map(function (q) {
         return '<button type="button" data-make="' + q[0] + '" title="' + q[1] + (ARCS[q[0]] ? ': drag from one node to another (click: once; double click: several)' : ' (click: once; double click: several)') + '" aria-label="' + q[1] + '" aria-pressed="false">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">' + q[2] + '</svg></button>';
       }).join('') + '</div>';
-    }).join('');
+      }).join('');
+    }
+    // the notation, PD or AF, and with AF its look, as sign buttons in one row (user, 2026-11-15: "like icons. You press and
+    // they stay pressed", nothing in the Edit window draws the eye; CLAUDE.md, A quiet Edit window): PD and AF as letters at
+    // about the 13 px of the text buttons before (user: "PD large, AF large"), the look as the glyph it draws, SBGN's
+    // activity (a rectangle with the entity's shape on its top edge) or the entity itself (Reduced notation), the names in
+    // the titles
+    // what the map is, read from its file as it is now (user, 2026-11-15; CLAUDE.md, Notations): empty (nothing but
+    // compartments), PD (a process of any kind, and no modulation ending on an entity), AF (no process; influences between
+    // activities), hybrid (processes and a modulation ending on an entity, as CellDesigner's reduced notation). A link to a
+    // phenotype or a gate is proper PD and decides nothing; a map that says neither way is what its file's language says
+    var EPN_CLS = /^(macromolecule|simple chemical|nucleic acid feature|unspecified entity|complex|perturbing agent)( multimer)?$|^biological activity$/;   // by class: not core.js's EPN (by yEd kind), which a var of the same name here replaced in the one scope, so no line could be drawn from an entity
+    var PROC = /^(process|omitted process|uncertain process|association|dissociation)$/;
+    var MODA = /^(modulation|stimulation|catalysis|inhibition|necessary stimulation|positive influence|negative influence|unknown influence)$/;
+    // the file is read again only when the drawing's structure changed (nodes, lines, their ends; the review: a write of
+    // the whole SBGN-ML file on every paint lagged nudging on large maps), never for a move
+    var kindMemo = [null, 'empty'];
+    function fileAf(t) { return sbJs.isAf(t); }   // the file's language, or SBGN-ML 0.3's version, says Activity Flow (sbgn_edit, the master)
+    function palKind() {
+      var key = [sb, nodes2.length, edges2.map(function (q) { return q.s + '>' + q.t + q.arr[1]; }).join()];
+      if (kindMemo[0] && kindMemo[0][0] === key[0] && kindMemo[0][1] === key[1] && kindMemo[0][2] === key[2]) return kindMemo[1];
+      var t = src() || '';
+      var attr = function (tag, k) { var m = tag.match(new RegExp('\\s' + k + '\\s*=\\s*["\']([^"\']*)')); return m ? m[1] : ''; };
+      var cls = {}, n = 0, proc = false, ent = false, act = false, mt, re = /<(?:\w+:)?glyph\b[^>]*>/g;
+      while ((mt = re.exec(t))) {   // a glyph's own children (state variables, units) are glyphs too: only those with an id that arcs name count
+        var c = attr(mt[0], 'class'), id = attr(mt[0], 'id');
+        if (id) cls[id] = c;
+        if (PROC.test(c)) proc = true;
+        if (c === 'biological activity') act = true;
+        if (c && !/^(compartment|state variable|unit of information|terminal)$/.test(c)) n++;
+      }
+      var are = /<(?:\w+:)?arc\b[^>]*>/g;
+      while ((mt = are.exec(t))) if (MODA.test(attr(mt[0], 'class')) && EPN_CLS.test(cls[attr(mt[0], 'target')] || '')) ent = true;
+      // nothing yet that decides (entities, phenotypes, gates, no process or influence): empty, both palettes open, unless
+      // the file says Activity Flow (the review: a first activity placed on an empty PD-labelled file locked it to PD)
+      var k = proc ? (ent ? 'hybrid' : 'pd') : ent || act || fileAf(t) ? 'af' : 'empty';
+      kindMemo = [key, k];
+      return k;
+    }
+    // a PD or hybrid map takes the PD palette only, an AF map the AF palette only, an empty map either (user, 2026-11-15:
+    // a hybrid map is a PD map with links between entities, saved as process description; Settings' Mixed retired)
+    function palLangs() { var k = palKind(); return k === 'empty' ? ['pd', 'af'] : [k === 'af' ? 'af' : 'pd']; }
+    // Hybrid links (user, 2026-11-15: "checkbox ... that allows it or disallow it"): under PD a modulation may also end on an
+    // entity, and a gate's output go to one, as CellDesigner's reduced notation; per map in this browser, ticked until
+    // unticked (user, 2026-11-15: "Checkbox ticked by default")
+    function hybOn() { return palLangNow() === 'pd' && (typeof palSet.hyb === 'boolean' ? palSet.hyb : true); }
+    function palLangNow() { var L = palLangs(); return L.indexOf(palSet.lang) >= 0 ? palSet.lang : L[0]; }
+    // the views (SBGN or CellDesigner) only where the map is pure Activity Flow or still empty (user, 2026-11-15: "you can
+    // do AF SBGN view of it only if there is no process on the map"); elsewhere the CellDesigner view, no switch shown
+    function palViews() { var k = palKind(); return palLangNow() === 'af' && (k === 'af' || k === 'empty'); }
+    // Activity Flow has no state variables and no text in a unit of information: a unit is only a sign of the entity's
+    // kind, a decorator (user, 2026-11-15: "nothing should be written in it ... The actual name goes into the large box");
+    // under AF none is added, typed into or picked, in either view
+    function afMap() { return !!sb && palOn() && palLangNow() === 'af'; }
+    function palLookNow() { return palViews() && palSet.look === 'sbgn' ? 'sbgn' : 'rn'; }
+    function palBtn(attr, title, sign) { return '<button type="button" ' + attr + ' title="' + title + '" aria-label="' + title + '" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">' + sign + '</svg></button>'; }
+    function palView(look, name, title) { return '<button type="button" role="radio" data-look="' + look + '" title="' + title + '" aria-label="' + title + '" aria-checked="false"><span class="m2-ed-radio" aria-hidden="true"></span>' + name + '</button>'; }
+    pal.innerHTML = '<div class="m2-ed-prow m2-ed-pnot" role="group" aria-label="Notation">' +
+      palBtn('data-lang="pd"', 'Process Description', '<text x="12" y="17.3" text-anchor="middle" font-size="15">PD</text>') +
+      palBtn('data-lang="af"', 'Activity Flow', '<text x="12" y="17.3" text-anchor="middle" font-size="15">AF</text>') + '</div>' +
+      // AF's two views as named round choices under the tabs (user, 2026-11-15: the two look icons beside PD and AF read as
+      // glyphs to drag onto the map), shown only where the views apply (palViews)
+      '<div class="m2-ed-plook" role="radiogroup" aria-label="Activity Flow view">' +
+      palView('rn', 'CellDesigner view', 'CellDesigner reduced notation view: the entities drawn as themselves') +
+      palView('sbgn', 'SBGN AF view', 'SBGN Activity Flow view: each entity drawn as its SBGN activity') + '</div>' +
+      '<label class="m2-ed-phyb" title="Under PD, a modulation may also end on an entity, and a logic gate\u2019s output go to one (CellDesigner\u2019s reduced notation); the file stays Process Description"><input type="checkbox"> Hybrid links</label>' +
+      '<div class="m2-ed-psigns"></div>';
+    var palSignsEl = pal.querySelector('.m2-ed-psigns'), palShown = null;
+    function palKey() { return palLangNow() === 'pd' ? 'pd' : palLookNow(); }
+    function palFill() {   // the signs of the set chosen; the tabs and the look marked
+      var k = palKey();
+      var lang = palLangNow(), langs = palLangs(), look = palLookNow(), kind = palKind();
+      Array.prototype.forEach.call(pal.querySelectorAll('[data-lang]'), function (b) {
+        var off = langs.indexOf(b.dataset.lang) < 0;
+        b.setAttribute('aria-pressed', String(b.dataset.lang === lang));
+        if (b.disabled !== off) b.disabled = off;
+        var tt = (b.dataset.lang === 'pd' ? 'Process Description' : 'Activity Flow') + (off ? ': not on ' + (kind === 'af' ? 'an Activity Flow' : kind === 'hybrid' ? 'a hybrid' : 'a Process Description') + ' map' : '');
+        if (b.title !== tt) { b.title = tt; b.setAttribute('aria-label', tt); }
+      });
+      Array.prototype.forEach.call(pal.querySelectorAll('[data-look]'), function (b) { b.setAttribute('aria-checked', String(b.dataset.look === look)); });
+      pal.querySelector('.m2-ed-plook').hidden = !palViews();
+      var hy = pal.querySelector('.m2-ed-phyb'), hyc = hy.querySelector('input');
+      hy.hidden = lang !== 'pd';
+      if (hyc.checked !== hybOn()) hyc.checked = hybOn();
+      if (palShown === k) return;
+      palShown = k;
+      if (tool && !palOk(tool.kind)) tool = null;   // a sign in hand that this set lacks (the review: a delay kept after the map turned PD)
+      palSignsEl.innerHTML = palSigns(PALS[k]);
+      var pi = palSignsEl.querySelector('.m2-ed-pinfo');
+      if (pi) pi.addEventListener('click', function (e) { e.stopPropagation(); help(true, 'Connecting arcs'); });
+    }
+    function palLook() {   // the map drawn in the SBGN view while AF's SBGN view is chosen and the map has no process (graphml.js afSbgn)
+      var want = palOn() && palLookNow() === 'sbgn';
+      if (want === afSbgn) return;
+      afSbgn = want;
+      if (on && V.current === map && !cd) render();
+    }
+    function palPick(lang, look) {
+      palSet = { lang: lang || palSet.lang, look: look || palSet.look, hyb: palSet.hyb };
+      if (tool && !palOk(tool.kind)) tool = null;
+      palKeep(); palFill(); palShow();   // palShow sets the look
+    }
+    function palOk(kind) { return PALS[palKey()].some(function (s) { return s[1].some(function (q) { return q[0] === kind; }); }); }
+    pal.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-lang], button[data-look]');
+      if (b && !b.disabled) palPick(b.dataset.lang, b.dataset.look);
+    });
+    pal.querySelector('.m2-ed-phyb input').addEventListener('change', function (e) { palSet.hyb = e.target.checked; palKeep(); });
+    var palMap = null;
+    function palSync() { var id = palId(); if (id !== palMap) { palMap = id; palSet = palFor(); palShown = null; palFill(); } }   // only when the map changes (palShow runs on every paint)
     box.querySelector('.m2-ed-tools').insertAdjacentElement('afterend', pal);
     function palOn() { return on && V.current === map && !!sb && !!sbJs && V.level === 'full'; }
     function palShow() {
       var show = palOn();
+      if (show) { palSync(); palFill(); }   // palFill: a process added or removed turns the SBGN view off or on
       pal.hidden = !show;
       if (!show) tool = null;
       Array.prototype.forEach.call(pal.querySelectorAll('button[data-make]'), function (b) {
@@ -66,6 +263,7 @@
       });
       if (!tool && V.view.style.cursor === 'default') V.view.style.cursor = '';
       if (props) propsShow();   // Properties (below), as the selection or Settings change
+      palLook();
     }
     function palTake(kind, sticky) { tool = kind ? { kind: kind, sticky: !!sticky } : null; palShow(); }
     pal.addEventListener('click', function (e) {
@@ -77,7 +275,7 @@
       var b = e.target.closest('button[data-make]');
       if (b) palTake(b.dataset.make, true);
     });
-    document.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('#m2-set-edit')) setTimeout(palShow, 0); }, true);   // Settings, Editing changed
+    document.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('#m2-set-edit, #m2-set-notations')) setTimeout(palShow, 0); }, true);   // Settings, Editing or Notations changed
     document.addEventListener('keydown', function (e) { if (tool && e.key === 'Escape') palTake(null); }, true);
 
     // the map clicked with something in hand: a press only noted, so a drag still moves the map; the click is taken on release
@@ -115,12 +313,13 @@
     function makeEntity(P, cls) {
       var cx = innermost(P, function (n) { return n.el.getAttribute('yfiles.foldertype') === 'group' && !n.comp; });
       if (cx >= 0) { warn('A new entity goes beside a complex for now, not into it.'); return; }
-      var D = defOf(cls), w = D.w, h = D.h, X = P[0] - w / 2, Y2 = P[1] - h / 2;
+      var units = PRESET[cls] ? PRESET[cls][1] : null; cls = baseKind(cls);
+      var act = ACT_UNIT[cls], D = defOf(cls), w = D.w, h = D.h, X = P[0] - w / 2, Y2 = P[1] - h / 2;   // act: an activity's unit
       if (gridSet.snap) { X += toGrid(X + w / 2, gridSet.step); Y2 += toGrid(Y2 + h / 2, gridSet.step); }   // its centre on the grid, as a drag puts it
       var c = innermost(P, function (n) { return n.comp; }), id = freeId('glyph_');
       var t2;
-      try { t2 = sbJs.add(text, { id: id, cls: cls, label: '', box: [+fmt(X), +fmt(Y2), w, h], parent: c >= 0 ? nodes2[c].id : null, fill: D.fill, line: D.line, width: D.width, multimer: D.multimer, font: D.font }); }
-      catch (err) { warn('The ' + cls + ' could not be added: ' + (err && err.message || err) + '.'); return; }
+      try { t2 = sbJs.add(text, { id: id, cls: act != null ? sbJs.unitClass(act) : cls, activity: act, label: '', box: [+fmt(X), +fmt(Y2), w, h], parent: c >= 0 ? nodes2[c].id : null, fill: D.fill, line: D.line, width: D.width, multimer: D.multimer, font: D.font, units: units || undefined }); }
+      catch (err) { warn('The ' + (act != null ? 'activity' : cls) + ' could not be added: ' + (err && err.message || err) + '.'); return; }
       remember(false); text = t2; made(id);
     }
     // the kinds of glyph the palette makes, and Delete removes (the map's own ones too)
@@ -151,7 +350,36 @@
     // multimer); [label, action] pairs
     window.m2EditNodeItems = function () {
       var P = rclick, k = P && palOn() && !svAt(P) ? madeAt(P) : -1;
-      if (k >= 0 && nodes2[k].shape.kind === 'NucleicAcidFeature' && /^nucleic acid feature( multimer)?$/.test(sbJs.classOf(src(), nodes2[k].id))) {   // its units of information, the conceptual types offered (user, 2026-11-14)
+      if (k < 0 && P && palOn()) {   // a modulation under the pointer: the other kinds (user, 2026-11-14: "via right click you can modify it")
+        var h = hit(P), ed = h && h.e != null && h.p == null ? edges2[h.e] : null, now = ed && Object.keys(MODK).filter(function (c) { return sbJs.ARROW[c] === ed.arr[1]; })[0];
+        var afN = afMap();   // under AF its influences, by AF's names (no catalysis there)
+        if (now) return Object.keys(MODK).filter(function (c) { return c !== now && !(c === 'catalysis' && (afN || roleOf(ed.t) === 'pheno')); }).map(function (c) {
+          return ['Make ' + (afN && sbJs.AF_ARC[c] || c), function () {
+            var t2 = sbJs.arcKind(text, ed.id, c);
+            if (t2 === text) return;
+            remember(false); text = t2; parse(); selN = []; selP = []; part = null;
+            selE = edges2.map(function (q, j) { return q.id === ed.id ? j : -1; }).filter(function (j) { return j >= 0; });
+            dirty = true; render(); paint(); changed();
+          }];
+        });
+      }
+      // an activity under AF (user, 2026-11-15: "add or change its unit ... and remove it"): made another kind, its unit
+      // given, or its unit taken off (a protein's activity again, "if there is no auxiliary unit, it's a protein activity")
+      var au = k >= 0 && afMap() ? sbJs.activities(text)[nodes2[k].id] : null;
+      if (au != null) {
+        var aid = nodes2[k].id, setU = function (u) { return function () { var t2 = sbJs.activity(text, aid, u); if (t2 === text) return; remember(false); text = t2; made(aid); }; };
+        return sbJs.UNITS.filter(function (u) { return u !== au && ACT_NAME[u]; }).map(function (u) { return ['Make ' + ACT_NAME[u], setU(u)]; })
+          .concat(au ? [['Remove unit of information', setU('')]] : []);
+      }
+      var gc = k >= 0 && nodes2[k].shape.kind === 'Operator' ? sbJs.classOf(src(), nodes2[k].id) : '';
+      if (/^(and|or|not)$/.test(gc)) {   // the other gates (user, 2026-11-15); an equivalence keeps its own rules (entities only)
+        var gid = nodes2[k].id;
+        var gins = edges2.filter(function (q) { return q.t === k; }).length;
+        return ['and', 'or', 'not'].filter(function (c) { return c !== gc && !(c === 'not' && gins > 1); }).map(function (c) {   // a NOT has one input
+          return ['Make ' + c.toUpperCase(), function () { var t2 = sbJs.kind(text, gid, c); if (t2 === text) return; remember(false); text = t2; made(gid); }];
+        });
+      }
+      if (k >= 0 && !afMap() && nodes2[k].shape.kind === 'NucleicAcidFeature' && /^nucleic acid feature( multimer)?$/.test(sbJs.classOf(src(), nodes2[k].id))) {   // its units of information, the conceptual types offered (user, 2026-11-14)
         var nid = nodes2[k].id;
         return [['Add unit of information', function () { makeUnit(nid); }],
                 ['Add unit of information ct:mRNA', function () { makeUnit(nid, 'ct:mRNA'); }],
@@ -164,7 +392,7 @@
           return ['Make ' + c, function () { var t2 = sbJs.kind(text, pid, c); if (t2 === text) return; remember(false); text = t2; made(pid); }];
         });
       }
-      var i = P && palOn() && !svAt(P) ? macroAt(P) : -1;
+      var i = P && palOn() && !afMap() && !svAt(P) ? macroAt(P) : -1;   // none added under AF (afMap)
       if (i < 0 || !/^macromolecule( multimer)?$/.test(sbJs.classOf(src(), nodes2[i].id))) return null;   // not an Activity Flow activity drawn as one (write() carries none of its changes)
       var id = nodes2[i].id, multi = isMulti(i);
       return [['Add state variable', function () { makeState(P); }],
@@ -175,6 +403,20 @@
                 remember(false); text = t2; made(id);
               }]];
     };
+    // the map's right-click menu under AF (user, 2026-11-15: "Add units of information to all activities", "I wouldn't add it
+    // to proteins at all"): a unit given to every activity with none whose kind is known and is not a protein's. An activity
+    // with no unit is a protein's (its file says no more), so on a map as its file has it every other one has its unit and
+    // the entry adds nothing, which it says
+    function afMapItems() {
+      var A = afMap() ? sbJs.activities(text) : {};
+      if (!Object.keys(A).length) return [];
+      return [['Add units of information to all activities', function () {
+        var KIND = { SimpleChemical: 'simple chemical', NucleicAcidFeature: 'nucleic acid feature', Complex: 'complex', UnspecifiedEntity: 'unspecified entity' }, t2 = text;
+        nodes2.forEach(function (n) { if (A[n.id] === '' && KIND[n.shape.kind]) t2 = sbJs.activity(t2, n.id, KIND[n.shape.kind]); });
+        if (t2 === text) { warn('Every activity shows its kind already: one with no unit is a protein\u2019s, and a protein takes none.'); return; }
+        remember(false); text = t2; made(null);
+      }]];
+    }
     function isMulti(i) {   // drawn as a multimer: yEd's mcount (sbgn_edit.multimer)
       var r = realizerOf(nodes2[i].el), sp = r && Array.prototype.filter.call(r.children, function (c) { return c.localName === 'StyleProperties'; })[0];
       return !!sp && Array.prototype.some.call(sp.children, function (c) { return c.getAttribute('name') === 'com.yworks.sbgn.style.mcount' && c.getAttribute('value') !== '1'; });
@@ -306,6 +548,7 @@
       if (i >= 0) { e.stopImmediatePropagation(); typeIn(nodes2[i].id, null); }
     }, true);
     function svAt(P) {   // the state variable or unit of information under P: [node, j] (it may stand out of its node)
+      if (afSbgn || afMap()) return null;   // not drawn in the SBGN AF view, and under AF no text in them: never clicked, moved or typed there
       var res = svIcons(), found = null, pad = 3 / V.z;
       nodes2.forEach(function (n, k) {
         if (n.shape.kind !== 'Macromolecule' && n.shape.kind !== 'NucleicAcidFeature') return;
@@ -499,11 +742,12 @@
         // drawn as the renderer draws the glyph (user, 2026-11-14: a CSS box with a 1 px border looked thin, its corners
         // round where yrender's are quadratic): its outline in map units (outlineD, core.js; radius 10, as sbgn_edit
         // writes), its border; a compartment unfilled, so the map shows through it
-        var w = D.w, h = D.h, cmp = palDrag.kind === 'compartment', sh = { kind: GHOST[palDrag.kind] || sbJs.MAKE[palDrag.kind], props: { radius: '10', radiusX: '12', radiusY: '12' } };
+        var w = D.w, h = D.h, cmp = palDrag.kind === 'compartment', au = ACT_UNIT[palDrag.kind], act = afSbgn && au != null, sh = act ? { kind: 'Macromolecule', props: { radius: '0' } } : { kind: GHOST[palDrag.kind] || sbJs.MAKE[au != null ? sbJs.unitClass(au) : baseKind(palDrag.kind)], props: { radius: '10', radiusX: '12', radiusY: '12' } };   // in the SBGN AF view an activity's rectangle, else its entity
         var ink = '" fill="' + (D.fill || (cmp ? 'none' : '#fff')) + '" stroke="' + (D.line || '#000') + '" stroke-width="' + (D.width || (cmp ? 2 : 1)) + '"/>';
         palDrag.img.innerHTML = '<svg width="100%" height="100%" viewBox="0 0 ' + w + ' ' + h + '" overflow="visible"><path d="' + outlineD(sh, 0, 0, w, h) + ink +
           (palDrag.kind === 'source and sink' ? '<path d="M0 ' + h + 'L' + w + ' 0' + ink : '') +
-          (sbJs.SIGN[palDrag.kind] ? '<text x="' + w / 2 + '" y="' + h * 0.75 + '" text-anchor="middle" font-family="Dialog, Arial, sans-serif" font-size="' + h * 0.75 + '">' + sbJs.SIGN[palDrag.kind] + '</text>' : '') + '</svg>';   // the sign as the renderer writes it
+          (sbJs.SIGN[palDrag.kind] ? '<text x="' + w / 2 + '" y="' + h * 0.75 + '" text-anchor="middle" font-family="Dialog, Arial, sans-serif" font-size="' + h * 0.75 + '">' + sbJs.SIGN[palDrag.kind] + '</text>' : '') +
+          (sbJs.GATE[palDrag.kind] ? '<text x="' + w / 2 + '" y="' + (h / 2 + 4.5) + '" text-anchor="middle" font-family="Dialog, Arial, sans-serif" font-size="12">' + sbJs.GATE[palDrag.kind] + '</text>' : '') + '</svg>';   // the sign as the renderer writes it
         V.view.appendChild(palDrag.img);
       }
       var r = V.view.getBoundingClientRect(), g = palDrag.img;
@@ -530,11 +774,11 @@
     // or vertical (sbgn_edit.connect). A sign picked in the palette's Connecting arcs is used as it is, from any node,
     // selected or not; let go on empty space, nothing is made. Delete, or Delete in the right-click menu, removes an arc.
     var link = null;   // { from, x, y, moved, to, P, how }
-    function linkEnd(P, not) {   // the innermost entity or process under P (a complex, not its member: roleOf), not node `not`
+    function linkEnd(P, not) {   // the innermost entity, process, gate or phenotype under P (a complex, not its member: roleOf), not node `not`
       var R = 4 / V.z, best = -1, ba = Infinity;
       nodes2.forEach(function (n, i) {
         var b = boxOf(i), r = roleOf(i);
-        if (i === not || (r !== 'epn' && r !== 'proc') || P[0] < b[0] - R || P[0] > b[0] + b[2] + R || P[1] < b[1] - R || P[1] > b[1] + b[3] + R) return;
+        if (i === not || !r || P[0] < b[0] - R || P[0] > b[0] + b[2] + R || P[1] < b[1] - R || P[1] > b[1] + b[3] + R) return;
         if (b[2] * b[3] < ba) { ba = b[2] * b[3]; best = i; }
       });
       return best;
@@ -552,16 +796,69 @@
       tap = { h: h, shift: false, x: e.clientX, y: e.clientY };   // no drag: a click, which selects (release, core.js)
       return true;
     }
-    function linkHow(a, b) {   // what a line from node a to node b makes: { cls }, { pair }, { no: the reason }, or null over nothing
+    // what a line from node a to node b makes: { cls }, { pair }, { no: the reason }, or null over nothing. P: where it is
+    // let go. With no sign picked (user, 2026-11-14: "it will be guessed ... via right click you can modify it"): an entity
+    // into a process a consumption, or a modulation when it lands on a side off the antennas of a process that has them;
+    // a process to an entity a production; two entities a process between them; into a gate a logic arc (from an entity,
+    // or a gate into a gate), out of a gate a stimulation (to a process or a phenotype), out of an equivalence a logic
+    // arc to its entity; an entity to a phenotype a stimulation. The modulation guessed is a stimulation, or a catalysis
+    // from a macromolecule or complex onto a process that consumes a simple chemical (a metabolic step)
+    function linkHow(a, b, P) {
       if (b < 0) return null;
-      var ra = roleOf(a), rb = roleOf(b), want = arcTool();
+      var ra = roleOf(a), rb = roleOf(b), want = arcTool(), eqA = !!nodes2[a].eq, eqB = !!nodes2[b].eq;
       var has = function (s, t, head) { return edges2.some(function (q) { return q.s === s && q.t === t && q.arr[1] === head; }); };
+      var ok = function (cls) { return has(a, b, sbJs.ARROW[cls]) ? { no: 'This ' + cls + ' is there already.' } : { cls: cls }; };
+      var outs = function (g) { return edges2.filter(function (q) { return q.s === g; }).length; }, ins = function (g) { return edges2.filter(function (q) { return q.t === g; }).length; };
+      if (ra === 'pheno') return { no: 'Nothing leaves a phenotype: it is modulated by an entity or a logic gate.' };
+      if (ra === 'gate' && outs(a)) return { no: 'A logic gate has one line out, and this one has it.' };   // SBGN PD; the converter's rules for the equivalence (the review)
+      var word = function (i) { var l = nodes2[i].el.getElementsByTagNameNS(Y, 'NodeLabel')[0]; return l ? l.textContent.trim() : ''; };   // a gate's word as drawn (a made one is not in the file yet)
+      if (rb === 'gate' && (word(b) === '\u03c4' || word(b).toUpperCase() === 'NOT') && ins(b)) return { no: 'A ' + (word(b) === '\u03c4' ? 'delay' : 'NOT gate') + ' has one input, and this one has it.' };
+      var af = palLangNow() === 'af';   // Activity Flow (user, 2026-11-15): influences join two activities, and leave a gate for one
+      if (af) {
+        if (ra === 'epn' && rb === 'epn') return want && !MODK[want] ? { no: 'Activity Flow joins activities by an influence.' } : ok(want || 'stimulation');
+        if (ra === 'gate' && !eqA && rb === 'epn') return want && !MODK[want] ? { no: 'A logic gate\u2019s output is an influence.' } : ok(want || 'stimulation');
+      } else if (hybOn()) {   // Hybrid links: a modulation picked may end on an entity (two entities with no sign still get a process between them)
+        if (ra === 'epn' && rb === 'epn' && want && MODK[want]) return want === 'catalysis' ? { no: 'A catalysis ends on a process.' } : ok(want);
+        if (ra === 'gate' && !eqA && rb === 'epn' && (!want || MODK[want])) return want === 'catalysis' ? { no: 'A catalysis ends on a process.' } : ok(want || 'stimulation');
+      }
+      if (want === 'logic arc' && rb !== 'gate' && !(eqA && rb === 'epn')) return { no: 'A logic arc goes into a logic gate.' };
+      if (want === 'catalysis' && rb === 'pheno') return { no: 'A catalysis ends on a process; a phenotype takes a stimulation, inhibition or modulation.' };   // as the converter's rules
+      if (want && MODK[want]) {   // a modulation picked: from an entity or a gate to a process or a phenotype
+        if ((ra === 'epn' || (ra === 'gate' && !eqA)) && (rb === 'proc' || rb === 'pheno')) return ok(want);
+        return { no: 'A ' + want + ' goes from an entity or a logic gate to a process or a phenotype' + (rb === 'epn' ? ' (Hybrid links in the palette allow it to an entity).' : '.') };
+      }
+      if (rb === 'gate') {   // a logic arc in: from an entity, or from a gate into a gate (never into or out of an equivalence)
+        if (want === 'production') return { no: 'A production goes from a process to an entity.' };
+        if (ra === 'proc') return { no: 'A process does not go into a logic gate: the gate’s output goes to the process.' };
+        if (ra === 'gate' && (eqA || eqB)) return { no: 'An equivalence joins entities only.' };
+        return ok('logic arc');
+      }
+      if (ra === 'gate') {   // a gate's output
+        if (want === 'logic arc' && eqA) return rb === 'epn' ? ok('logic arc') : { no: 'An equivalence\u2019s line goes to an entity.' };
+        if (want) return { no: 'A ' + want + ' does not leave a logic gate: its output is a modulation (a stimulation, unless another is picked).' };
+        if (eqA) return rb === 'epn' ? ok('logic arc') : { no: 'An equivalence’s line goes to an entity.' };
+        return rb === 'epn' ? { no: 'A logic gate’s output goes to a process, a phenotype or another gate (Hybrid links in the palette allow an entity).' } : ok('stimulation');
+      }
+      if (rb === 'pheno') {
+        if (ra !== 'epn' || want) return { no: 'A phenotype is modulated by an entity or a logic gate (a stimulation, unless another modulation is picked).' };
+        return ok('stimulation');
+      }
       if (ra === 'proc' && rb === 'proc') return { no: 'An arc goes from an entity into a process (a consumption) or from a process to an entity (a production), not between two processes.' };
       if (ra === 'epn' && rb === 'epn') return want ? { no: 'A ' + want + ' goes ' + (want === 'consumption' ? 'from an entity into a process.' : 'from a process to an entity.') + ' Two entities are joined with no sign picked: a process is made between them.' } : { pair: true };
       var cls = ra === 'epn' ? 'consumption' : 'production';
       if (want && want !== cls) return { no: want === 'consumption' ? 'A consumption goes from an entity into a process.' : 'A production goes from a process to an entity.' };
+      if (!want && cls === 'consumption' && P && offAxis(b, P)) {   // landed on a side off the antennas: a modulation
+        var n = nodes2[a], sub = edges2.some(function (q) { return q.t === b && q.arr[1] === 'none' && nodes2[q.s].shape.kind === 'SimpleChemical'; });
+        return ok(sub && (/^(Macromolecule|Complex)$/.test(n.shape.kind) || n.kids.length > 0) ? 'catalysis' : 'stimulation');
+      }
       if (has(a, b, cls === 'production' ? 'delta' : 'none')) return { no: 'This ' + cls + ' is there already.' };
       return { cls: cls };
+    }
+    function offAxis(i, P) {   // P on a side off the antennas of process i, one with a consumption or production (a bare one has no axis yet)
+      var id = nodes2[i].id, H = window.yrender && hubPorts()[id], b = bx(i), c = [b[0] + b[2] / 2, b[1] + b[3] / 2];
+      if (!H || !H[0] || !edges2.some(function (q) { return (q.t === i && q.arr[1] === 'none') || (q.s === i && q.arr[1] === 'delta'); })) return false;
+      var hz = Math.abs(H[0][0] - c[0]) >= Math.abs(H[0][1] - c[1]), dx = Math.abs(P[0] - c[0]), dy = Math.abs(P[1] - c[1]);
+      return hz ? dy > dx : dx > dy;
     }
     function linkMove(e) {   // the pointer moving with a line begun (core.js)
       if (!link || e.pointerId !== link.pid) return false;
@@ -569,7 +866,7 @@
       if ((e.pointerType === 'mouse' && !e.buttons) || link.at !== text) { link = null; tap = null; paint(); return true; }   // its release never came; the map changed under it (undo)
       if (!link.moved && Math.hypot(e.clientX - link.x, e.clientY - link.y) < 5) return true;
       link.moved = true; tap = null;
-      link.P = at(e); link.to = linkEnd(link.P, link.from); link.how = linkHow(link.from, link.to);
+      link.P = at(e); link.to = linkEnd(link.P, link.from); link.how = linkHow(link.from, link.to, link.P);
       paint();
       return true;
     }
@@ -612,7 +909,6 @@
       out.push('<path class="m2-ed-live" stroke-width="' + f1(Math.max(1, V.z)) + '"' + (no ? ' stroke-dasharray="4 3"' : '') + ' d="M' + f1(sx(C[0])) + ' ' + f1(sy(C[1])) + 'L' + f1(sx(link.P[0])) + ' ' + f1(sy(link.P[1])) + '"/>');
     }
     document.addEventListener('keydown', function (e) { if (link && e.key === 'Escape') { link = null; tap = null; paint(); } }, true);
-    pal.querySelector('.m2-ed-pinfo').addEventListener('click', function (e) { e.stopPropagation(); help(true, 'Connecting arcs'); });
 
     // ---------- resizing and Properties (user, 2026-11-14) ----------
     // A macromolecule or a simple chemical selected is resized by its eight handles: the sides dragged move, its width and
@@ -623,7 +919,7 @@
     // scales what the SBGN-ML glyph carries the same way.
     function sizable(i) {   // not a member of a complex (Pack keeps a complex's members to the layout rules)
       var n = nodes2[i], u = n && n.up != null ? nodes2[n.up] : null;
-      return palOn() && !!n && isMade(n) && n.shape.kind !== 'Process' && (!u || u.comp);   // a process keeps its size (its antennas)
+      return palOn() && !!n && isMade(n) && n.shape.kind !== 'Process' && n.shape.kind !== 'Operator' && (!u || u.comp);   // a process or gate keeps its size (its antennas)
     }
     var sizeRec = null;   // the node drawn live while it is resized: its parts and how they were
     function sizeLive(i, nb) {
@@ -761,6 +1057,8 @@
     var DEF_KEY = 'atlas-edit-defaults';
     function defsKept() { try { return JSON.parse(localStorage.getItem(DEF_KEY) || '{}') || {}; } catch (e) { return {}; } }
     function defOf(cls) {   // the look a new glyph of that kind gets: the map's (sbgn_edit.defaults), or the one set as default
+      cls = baseKind(cls);
+      if (ACT_UNIT[cls] != null) cls = 'biological activity';   // every activity alike (user, 2026-11-15: "All activities should have the same size")
       var D = sbJs.defaults(src(), null, cls), k = defsKept()[cls];
       D.multimer = false;
       if (k) {
