@@ -1,14 +1,15 @@
 # The collections, one per page; the switcher on the site's title lists them in this order. accent: the collection's
-# own colour (the viewer's accent: the chosen map in the list), a first proposal to be chosen.
+# own colour (the viewer's accent: the chosen map in the list), quiet colours only (user, 2026-11-15: greys and blues,
+# never brown, yellow or a bright magenta), taken from the Highlight Colours left on the icon board.
 - id: air
   name: Atlas of Inflammation Resolution
   path: /air/
-  accent: "#b0566b"
+  accent: "#5f6b78"
 - id: kegg
   name: KEGG global metabolic map
   path: /kegg/
-  accent: "#3f8a5a"
+  accent: "#4183c4"
 - id: reconmap
   name: ReconMap
   path: /reconmap/
-  accent: "#b07a2c"
+  accent: "#4d5560"
