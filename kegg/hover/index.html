@@ -51,7 +51,7 @@ collection: kegg-hover
 </head>
 <body>
 <header>
-  <h1 data-forge-title>Global metabolic map</h1>
+  <h1 data-forge-title>{% assign col = site.data.collections | where: "id", page.collection | first %}{{ col.name }}</h1>
   <div class="tabs" id="tabs" hidden>
     <button type="button" data-map="kegg-2026" aria-pressed="false" title="KEGG map 01100 as it is now">Current</button>
     <button type="button" data-map="kegg-2017" aria-pressed="false" title="KEGG map 01100 of 2017, with the class boxes">2017, with classes</button>

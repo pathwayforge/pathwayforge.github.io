@@ -8,5 +8,5 @@ permalink: /
   // the site's address opens the collection last opened in this browser, else the first
   var paths = { {% for c in site.data.collections %}{{ c.id | jsonify }}: {{ c.path | jsonify }}{% unless forloop.last %}, {% endunless %}{% endfor %} }, last = null;
   try { last = localStorage.getItem('forge-collection'); } catch (e) {}
-  location.replace('{{ site.baseurl }}' + (paths[last] || {{ site.data.collections[0].path | jsonify }}));
+  location.replace('{{ site.baseurl }}' + (Object.prototype.hasOwnProperty.call(paths, last) && paths[last] || {{ site.data.collections[0].path | jsonify }}));
 </script></head><body></body></html>

@@ -1,7 +1,5 @@
 name: Pathway Forge
 description: "Published pathway resources, for review"
-footer-links:
-  github: pathwayforge
 google_analytics:
 url: https://pathwayforge.github.io
 baseurl: ""

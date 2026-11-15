@@ -35,14 +35,14 @@ this browser (forge-collection) so the site's address opens it next time. The ti
   ['touchend', 'touchmove', 'touchcancel'].forEach(function (n) { title.addEventListener(n, function () { clearTimeout(held); }, { passive: true }); });
   document.addEventListener('mousedown', function (e) { if (!menu.hidden && !menu.contains(e.target)) close(); });
   document.addEventListener('touchstart', function (e) { if (!menu.hidden && !menu.contains(e.target) && e.target !== title) close(); }, { passive: true });
+  // capture, so the viewer's own keys (arrows step through maps, Esc closes the annotation) never see these
   document.addEventListener('keydown', function (e) {
-    if (menu.hidden) return;
+    if (menu.hidden || !/^(Escape|ArrowDown|ArrowUp)$/.test(e.key)) return;
+    e.preventDefault(); e.stopPropagation();
     if (e.key === 'Escape') { close(); return; }
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      var a = [].slice.call(menu.querySelectorAll('a')), i = a.indexOf(document.activeElement);
-      a[(i + (e.key === 'ArrowDown' ? 1 : a.length - 1)) % a.length].focus(); e.preventDefault();
-    }
-  });
+    var a = [].slice.call(menu.querySelectorAll('a')), i = a.indexOf(document.activeElement);
+    a[(i + (e.key === 'ArrowDown' ? 1 : a.length - 1)) % a.length].focus();
+  }, true);
   addEventListener('resize', close); addEventListener('scroll', close, true);
 })();
 </script>
