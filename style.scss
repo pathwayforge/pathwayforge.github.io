@@ -451,5 +451,6 @@ div.img img{
 .site-name { font-size: 20px; cursor: default; }
 // The name always in one place, at the left, in line with the list's map names, on every collection and at every
 // width (user, 2026-11-15: "You can change the title, but don't change the place"); was centred with the page
-.wrapper-masthead .container { max-width: none; margin: 0; padding: 0 16px; }
+html .wrapper-masthead .container { width: auto; max-width: none; margin: 0; padding: 0 16px; }   /* html: over the look's own width */
+html .masthead { padding-left: 0; }
 .masthead, .site-info { text-align: left; float: none; }
