@@ -13,3 +13,7 @@
   name: ReconMap
   path: /reconmap/
   accent: "#4d5560"
+- id: limemap
+  name: LimeMap
+  path: /limemap/
+  accent: "#5a7184"
