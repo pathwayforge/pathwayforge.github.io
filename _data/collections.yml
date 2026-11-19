@@ -17,3 +17,7 @@
   name: LimeMap
   path: /limemap/
   accent: "#5a7184"
+- id: tlr
+  name: TLR signalling (Oda and Kitano 2006)
+  path: /tlr/
+  accent: "#6e7781"
