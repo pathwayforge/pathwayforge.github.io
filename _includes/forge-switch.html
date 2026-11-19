@@ -1,7 +1,8 @@
 {% comment %}
-The collections switcher: a right click on the site's title ([data-forge-title]), or a press held half a second on a
-touch screen, opens the list of collections (_data/collections.yml); a click goes to that collection's page, kept in
-this browser (forge-collection) so the site's address opens it next time. The title's only way in, by design.
+The collections switcher: a click on the site's title ([data-forge-title]), a right click there, a press held half a
+second on a touch screen, or Enter on the focused title opens the list of collections (_data/collections.yml); a click
+on the title again closes it. A click in the list goes to that collection's page, kept in this browser
+(forge-collection) so the site's address opens it next time. The title's only way in, by design.
 {% endcomment %}
 <style>
   #forge-menu { position: fixed; z-index: 1000; min-width: 240px; padding: 4px 0; background: #fff; border: 1px solid #dadce0;
@@ -11,12 +12,12 @@ this browser (forge-collection) so the site's address opens it next time. The ti
   #forge-menu a:hover, #forge-menu a:focus { background: #f1f3f4; outline: none; }
   #forge-menu a i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
   #forge-menu a.on { color: #000; font-weight: 400; }
-  [data-forge-title] { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+  [data-forge-title] { cursor: pointer; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
 </style>
 <div id="forge-menu" role="menu" hidden>{% for c in site.data.collections %}<a role="menuitem" href="{{ site.baseurl }}{{ c.path }}" data-id="{{ c.id }}"{% if c.id == page.collection %} class="on"{% endif %}><i style="background:{{ c.accent }}"></i>{{ c.name }}</a>{% endfor %}</div>
 <script>
 (function () {
-  var menu = document.getElementById('forge-menu'), title = document.querySelector('[data-forge-title]'), held = null;
+  var menu = document.getElementById('forge-menu'), title = document.querySelector('[data-forge-title]'), held = null, fromHold = false;
   try { if ('{{ page.collection }}') localStorage.setItem('forge-collection', '{{ page.collection }}'); } catch (e) {}
   if (!title) return;
   function open(x, y) {
@@ -27,13 +28,25 @@ this browser (forge-collection) so the site's address opens it next time. The ti
     (menu.querySelector('a.on') || menu.querySelector('a')).focus();
   }
   function close() { menu.hidden = true; }
+  function below() { var r = title.getBoundingClientRect(); open(r.left, r.bottom + 4); }
+  title.setAttribute('role', 'button'); title.setAttribute('tabindex', '0'); title.setAttribute('aria-haspopup', 'menu');
+  // a click opens under the title, a second click closes; the click a long press may leave behind is ignored
+  title.addEventListener('click', function () {
+    if (fromHold) { fromHold = false; return; }
+    if (menu.hidden) below(); else close();
+  });
+  title.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault(); if (menu.hidden) below(); else close();
+  });
   title.addEventListener('contextmenu', function (e) { e.preventDefault(); clearTimeout(held); open(e.clientX, e.clientY); });
   title.addEventListener('touchstart', function (e) {
     var t = e.touches[0];
-    held = setTimeout(function () { open(t.clientX, t.clientY + 12); }, 500);
+    fromHold = false;
+    held = setTimeout(function () { fromHold = true; open(t.clientX, t.clientY + 12); }, 500);
   }, { passive: true });
   ['touchend', 'touchmove', 'touchcancel'].forEach(function (n) { title.addEventListener(n, function () { clearTimeout(held); }, { passive: true }); });
-  document.addEventListener('mousedown', function (e) { if (!menu.hidden && !menu.contains(e.target)) close(); });
+  document.addEventListener('mousedown', function (e) { if (!menu.hidden && !menu.contains(e.target) && e.target !== title) close(); });
   document.addEventListener('touchstart', function (e) { if (!menu.hidden && !menu.contains(e.target) && e.target !== title) close(); }, { passive: true });
   // capture, so the viewer's own keys (arrows step through maps, Esc closes the annotation) never see these
   document.addEventListener('keydown', function (e) {
