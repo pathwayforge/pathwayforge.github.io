@@ -2653,11 +2653,16 @@ page, so its styles keep the base they were made on). The looks before (Default 
     if (location.hash.slice(1) !== id) location.hash = id;
     route();
   }
+  // the map last shown on this page, remembered in the reader's browser (user, 2026-11-20: the page opens on the map and
+  // its group where the reader left it, not on the first map every time)
+  var lastKey = 'atlas-last:' + location.pathname;
+  function lastShown() { try { return localStorage.getItem(lastKey) || ''; } catch (e) { return ''; } }
   function route(e) {
-    // no map named: the first map; in development mode the first map of an open group, so a group closed at first
-    // stays closed
-    var h0 = location.hash.slice(1), m = byId[h0] || byId[arrived[h0]] || (DEV && maps.filter(function (x) { return !closed[x.group]; })[0]) || maps[0];
+    // no map named: the map last shown here, else the first map; in development mode the first map of an open group, so
+    // a group closed at first stays closed
+    var h0 = location.hash.slice(1), m = byId[h0] || byId[arrived[h0]] || (!h0 && byId[lastShown()]) || (DEV && maps.filter(function (x) { return !closed[x.group]; })[0]) || maps[0];
     if (!m) return;
+    try { localStorage.setItem(lastKey, m.id); } catch (x) {}
     if (e && e.type === 'hashchange' && m === chosen) return; // already routed by go() or an arrow key
     if (!pending) lastHit = null; // chosen from the map list, not a search result
     if (closed[m.group]) { closed[m.group] = false; saveClosed(); } // the chosen map's group is always open
