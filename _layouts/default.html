@@ -6,6 +6,18 @@
     <link rel="stylesheet" type="text/css" href="{{ site.baseurl }}/style.css?v={{ site.time | date: '%s' }}" />
     {% assign col = site.data.collections | where: "id", page.collection | first %}
     {% if col %}<style>:root { --m2-accent: {{ col.accent }}; }</style>{% endif %}
+    {% if col and page.url == col.path %}<script>
+      // a collection's page reached from outside the site (a bookmark, a typed or pasted address) and naming no map
+      // opens the collection last opened in this browser, whose page then opens its map last shown (user, 2026-11-20:
+      // the book first, then the map); a move inside the site (the switcher) stays where it goes
+      (function () {
+        var paths = { {% for c in site.data.collections %}{{ c.id | jsonify }}: {{ c.path | jsonify }}{% unless forloop.last %}, {% endunless %}{% endfor %} }, last = null, inside = false;
+        try { last = localStorage.getItem('forge-collection'); } catch (e) {}
+        try { inside = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch (e) {}
+        if (!inside && !location.hash && last && last !== {{ page.collection | jsonify }} && Object.prototype.hasOwnProperty.call(paths, last))
+          location.replace('{{ site.baseurl }}' + paths[last]);
+      })();
+    </script>{% endif %}
   </head>
   <body>
     <div class="wrapper-masthead">
