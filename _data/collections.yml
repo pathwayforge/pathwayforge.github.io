@@ -21,3 +21,7 @@
   name: TLR signalling (Oda and Kitano 2006)
   path: /tlr/
   accent: "#6e7781"
+- id: neuroinflammation
+  name: Neuroinflammation (MINERVA set)
+  path: /neuroinflammation/
+  accent: "#5b6d80"
