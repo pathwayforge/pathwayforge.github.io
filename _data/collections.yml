@@ -1,52 +1,52 @@
 # The collections, one per page; the switcher on the site's title lists them by name, alphabetically (a new one may go
 # anywhere here); the first is the one the site's address opens when none was opened before. accent: the collection's
 # own colour (the viewer's accent: the chosen map in the list), a set like markers in their box: one lightness and
-# strength, the hue stepping from plum through violet, blue, cyan and teal to green (no reds, browns or yellows), given in the switcher's order so its dots flow down the list. A new collection takes the hue between its neighbours.
+# strength, the hue stepping round the wheel from green through teal, blue, violet and plum to red (no browns), given in the switcher's order so its dots flow down the list. A new collection takes the hue between its neighbours.
 - id: air
   name: Atlas of Inflammation Resolution
   path: /air/
-  accent: "#406aa1"
+  accent: "#00758d"
 - id: kegg
   name: KEGG global metabolic map
   path: /kegg/
-  accent: "#07758c"
+  accent: "#4c67a3"
 - id: reconmap
   name: ReconMap
   path: /reconmap/
-  accent: "#437842"
+  accent: "#954f6b"
 - id: limemap
   name: LimeMap
   path: /limemap/
-  accent: "#02787c"
+  accent: "#665f9f"
 - id: tlr
   name: TLR signalling (Oda and Kitano 2006)
   path: /tlr/
-  accent: "#5c732d"
+  accent: "#9a4f53"
 - id: neuroinflammation
   name: Neuroinflammation (MINERVA set)
   path: /neuroinflammation/
-  accent: "#227a57"
+  accent: "#8a5282"
 - id: minerva-zip
   name: MINERVA zip (read and packed back)
   path: /minerva-zip/
-  accent: "#087a6c"
+  accent: "#7a5894"
 - id: ad-uc
   name: AD and UC comparison (MINERVA zip)
   path: /ad-uc/
-  accent: "#895284"
+  accent: "#587430"
 - id: hidmap
   name: HIDmap (MINERVA zip)
   path: /hidmap/
-  accent: "#20719b"
+  accent: "#2a6f9d"
 - id: asthmamap
   name: AsthmaMap (MINERVA zip)
   path: /asthmamap/
-  accent: "#6b5d9d"
+  accent: "#067b64"
 - id: acsn
   name: Atlas of Cancer Signalling Network (ACSN 2.0)
   path: /acsn/
-  accent: "#5764a2"
+  accent: "#03787a"
 - id: air-zip
   name: AIR (MINERVA zip)
   path: /air-zip/
-  accent: "#7c5793"
+  accent: "#38794a"
