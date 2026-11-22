@@ -29,3 +29,11 @@
   name: MINERVA zip (read and packed back)
   path: /minerva-zip/
   accent: "#66727f"
+- id: ad-uc
+  name: AD and UC comparison (MINERVA zip)
+  path: /ad-uc/
+  accent: "#5e6e7e"
+- id: hidmap
+  name: HIDmap (MINERVA zip)
+  path: /hidmap/
+  accent: "#56677a"

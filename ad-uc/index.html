@@ -1,0 +1,11 @@
+---
+layout: default
+title: AD and UC comparison
+permalink: /ad-uc/
+collection: ad-uc
+---
+{% comment %}
+A closed page: a MINERVA zip drawn as it is, in the viewer's closed mode. Its maps are not on this site: they are in
+the organisation's private data repository (closed/ad-uc/), read through GitHub's API after sign-in with the site's token.
+{% endcomment %}
+{% include atlas-app.html index="/ad-uc/index.json" search="/ad-uc/atlas-data/search.json" name="AD and UC comparison" closed="ad-uc" %}
