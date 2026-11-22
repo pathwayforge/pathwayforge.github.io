@@ -1,52 +1,52 @@
 # The collections, one per page; the switcher on the site's title lists them by name, alphabetically (a new one may go
 # anywhere here); the first is the one the site's address opens when none was opened before. accent: the collection's
-# own colour (the viewer's accent: the chosen map in the list), quiet colours only (user, 2026-11-15: greys and blues,
-# never brown, yellow or a bright magenta), taken from the Highlight Colours left on the icon board.
+# own colour (the viewer's accent: the chosen map in the list), a pencil set: one lightness and softness, the hue
+# stepping from green to rose (no browns or yellows), given in the switcher's order so its dots flow down the list. A new collection takes the hue between its neighbours.
 - id: air
   name: Atlas of Inflammation Resolution
   path: /air/
-  accent: "#5f6b78"
+  accent: "#397282"
 - id: kegg
   name: KEGG global metabolic map
   path: /kegg/
-  accent: "#4183c4"
+  accent: "#56698f"
 - id: reconmap
   name: ReconMap
   path: /reconmap/
-  accent: "#4d5560"
+  accent: "#87596c"
 - id: limemap
   name: LimeMap
   path: /limemap/
-  accent: "#5a7184"
+  accent: "#65648d"
 - id: tlr
   name: TLR signalling (Oda and Kitano 2006)
   path: /tlr/
-  accent: "#6e7781"
+  accent: "#8a595d"
 - id: neuroinflammation
   name: Neuroinflammation (MINERVA set)
   path: /neuroinflammation/
-  accent: "#5b6d80"
+  accent: "#7f5b7b"
 - id: minerva-zip
   name: MINERVA zip (read and packed back)
   path: /minerva-zip/
-  accent: "#66727f"
+  accent: "#735f86"
 - id: ad-uc
   name: AD and UC comparison (MINERVA zip)
   path: /ad-uc/
-  accent: "#5e6e7e"
+  accent: "#5c7148"
 - id: hidmap
   name: HIDmap (MINERVA zip)
   path: /hidmap/
-  accent: "#56677a"
+  accent: "#466e8b"
 - id: asthmamap
   name: AsthmaMap (MINERVA zip)
   path: /asthmamap/
-  accent: "#5b6b78"
+  accent: "#3d7566"
 - id: acsn
   name: Atlas of Cancer Signalling Network (ACSN 2.0)
   path: /acsn/
-  accent: "#4f6273"
+  accent: "#357576"
 - id: air-zip
   name: AIR (MINERVA zip)
   path: /air-zip/
-  accent: "#5f6b78"
+  accent: "#4b7457"
