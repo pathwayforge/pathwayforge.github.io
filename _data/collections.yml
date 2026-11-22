@@ -29,6 +29,7 @@
   name: MINERVA zip (read and packed back)
   path: /minerva-zip/
   accent: "#66727f"
+<<<<<<< Updated upstream
 - id: ad-uc
   name: AD and UC comparison (MINERVA zip)
   path: /ad-uc/
@@ -37,3 +38,9 @@
   name: HIDmap (MINERVA zip)
   path: /hidmap/
   accent: "#56677a"
+=======
+- id: acsn
+  name: Atlas of Cancer Signalling Network (ACSN 2.0)
+  path: /acsn/
+  accent: "#56687a"
+>>>>>>> Stashed changes
