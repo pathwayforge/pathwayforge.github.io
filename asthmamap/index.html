@@ -1,0 +1,11 @@
+---
+layout: default
+title: AsthmaMap
+permalink: /asthmamap/
+collection: asthmamap
+---
+{% comment %}
+A closed page: a MINERVA zip drawn as it is, in the viewer's closed mode. Its maps are not on this site: they are in
+the organisation's private data repository (closed/asthmamap/), read through GitHub's API after sign-in with the site's token.
+{% endcomment %}
+{% include atlas-app.html index="/asthmamap/index.json" search="/asthmamap/atlas-data/search.json" name="AsthmaMap" closed="asthmamap" %}

@@ -37,6 +37,10 @@
   name: HIDmap (MINERVA zip)
   path: /hidmap/
   accent: "#56677a"
+- id: asthmamap
+  name: AsthmaMap (MINERVA zip)
+  path: /asthmamap/
+  accent: "#5b6b78"
 - id: acsn
   name: Atlas of Cancer Signalling Network (ACSN 2.0)
   path: /acsn/
