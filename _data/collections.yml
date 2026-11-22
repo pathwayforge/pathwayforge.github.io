@@ -25,3 +25,7 @@
   name: Neuroinflammation (MINERVA set)
   path: /neuroinflammation/
   accent: "#5b6d80"
+- id: minerva-zip
+  name: MINERVA zip (read and packed back)
+  path: /minerva-zip/
+  accent: "#66727f"
