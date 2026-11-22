@@ -9,12 +9,19 @@ on the title again closes it. A click in the list goes to that collection's page
     border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.12); font: 300 15px/1.4 "Helvetica Neue", Helvetica, Arial, sans-serif; }
   #forge-menu[hidden] { display: none; }
   #forge-menu a { display: flex; align-items: center; gap: 10px; padding: 7px 14px; color: #333; text-decoration: none; }
+  #forge-menu:focus { outline: none; }
+  /* a row is highlighted as a button, by a grey background on hover or keyboard focus; the text never changes (no
+     colour, no bold), and the open collection is not marked */
   #forge-menu a:hover, #forge-menu a:focus { background: #f1f3f4; outline: none; }
   #forge-menu a i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
-  #forge-menu a.on { color: #000; font-weight: 400; }
-  [data-forge-title] { cursor: pointer; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+  /* the title as a button: grey behind it on hover and while its list is open; the negative margin keeps the text in place */
+  [data-forge-title] { cursor: pointer; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none;
+    display: inline-block; padding: 0 8px; margin-left: -8px; border-radius: 6px; }
+  [data-forge-title]:hover, [data-forge-title][aria-expanded="true"] { background: #f1f3f4; }
+  [data-forge-title]:focus { outline: none; }
+  [data-forge-title]:focus-visible { outline: 1px solid #bdc1c6; outline-offset: 1px; }
 </style>
-<div id="forge-menu" role="menu" hidden>{% for c in site.data.collections %}<a role="menuitem" href="{{ site.baseurl }}{{ c.path }}" data-id="{{ c.id }}"{% if c.id == page.collection %} class="on"{% endif %}><i style="background:{{ c.accent }}"></i>{{ c.name }}</a>{% endfor %}</div>
+<div id="forge-menu" role="menu" tabindex="-1" hidden>{% for c in site.data.collections %}<a role="menuitem" href="{{ site.baseurl }}{{ c.path }}" data-id="{{ c.id }}"><i style="background:{{ c.accent }}"></i>{{ c.name }}</a>{% endfor %}</div>
 <script>
 (function () {
   var menu = document.getElementById('forge-menu'), title = document.querySelector('[data-forge-title]'), held = null, fromHold = false;
@@ -25,9 +32,10 @@ on the title again closes it. A click in the list goes to that collection's page
     var w = menu.offsetWidth, h = menu.offsetHeight;
     menu.style.left = Math.max(8, Math.min(x, innerWidth - w - 8)) + 'px';
     menu.style.top = Math.max(8, Math.min(y, innerHeight - h - 8)) + 'px';
-    (menu.querySelector('a.on') || menu.querySelector('a')).focus();
+    title.setAttribute('aria-expanded', 'true');
+    menu.focus();   // the list itself, so no row starts highlighted; the arrows go to the first or last row
   }
-  function close() { menu.hidden = true; }
+  function close() { menu.hidden = true; title.setAttribute('aria-expanded', 'false'); }
   function below() { var r = title.getBoundingClientRect(); open(r.left, r.bottom + 4); }
   title.setAttribute('role', 'button'); title.setAttribute('tabindex', '0'); title.setAttribute('aria-haspopup', 'menu');
   // a click opens under the title, a second click closes; the click a long press may leave behind is ignored
@@ -54,7 +62,8 @@ on the title again closes it. A click in the list goes to that collection's page
     e.preventDefault(); e.stopPropagation();
     if (e.key === 'Escape') { close(); return; }
     var a = [].slice.call(menu.querySelectorAll('a')), i = a.indexOf(document.activeElement);
-    a[(i + (e.key === 'ArrowDown' ? 1 : a.length - 1)) % a.length].focus();
+    var down = e.key === 'ArrowDown';
+    a[i < 0 ? (down ? 0 : a.length - 1) : (i + (down ? 1 : a.length - 1)) % a.length].focus();
   }, true);
   addEventListener('resize', close); addEventListener('scroll', close, true);
 })();
