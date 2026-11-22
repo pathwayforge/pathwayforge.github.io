@@ -1,6 +1,7 @@
 {% comment %}
 The collections switcher: a click on the site's title ([data-forge-title]), a right click there, a press held half a
-second on a touch screen, or Enter on the focused title opens the list of collections (_data/collections.yml); a click
+second on a touch screen, or Enter on the focused title opens the list of collections (_data/collections.yml),
+listed by name in alphabetical order; a click
 on the title again closes it. A click in the list goes to that collection's page, kept in this browser
 (forge-collection) so the site's address opens it next time. The title's only way in, by design.
 {% endcomment %}
@@ -21,7 +22,7 @@ on the title again closes it. A click in the list goes to that collection's page
   [data-forge-title]:focus { outline: none; }
   [data-forge-title]:focus-visible { outline: 1px solid #bdc1c6; outline-offset: 1px; }
 </style>
-<div id="forge-menu" role="menu" tabindex="-1" hidden>{% for c in site.data.collections %}<a role="menuitem" href="{{ site.baseurl }}{{ c.path }}" data-id="{{ c.id }}"><i style="background:{{ c.accent }}"></i>{{ c.name }}</a>{% endfor %}</div>
+<div id="forge-menu" role="menu" tabindex="-1" hidden>{% assign sorted = site.data.collections | sort_natural: "name" %}{% for c in sorted %}<a role="menuitem" href="{{ site.baseurl }}{{ c.path }}" data-id="{{ c.id }}"><i style="background:{{ c.accent }}"></i>{{ c.name }}</a>{% endfor %}</div>
 <script>
 (function () {
   var menu = document.getElementById('forge-menu'), title = document.querySelector('[data-forge-title]'), held = null, fromHold = false;

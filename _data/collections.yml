@@ -1,4 +1,5 @@
-# The collections, one per page; the switcher on the site's title lists them in this order. accent: the collection's
+# The collections, one per page; the switcher on the site's title lists them by name, alphabetically (a new one may go
+# anywhere here); the first is the one the site's address opens when none was opened before. accent: the collection's
 # own colour (the viewer's accent: the chosen map in the list), quiet colours only (user, 2026-11-15: greys and blues,
 # never brown, yellow or a bright magenta), taken from the Highlight Colours left on the icon board.
 - id: air
