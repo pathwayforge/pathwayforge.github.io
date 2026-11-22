@@ -1939,6 +1939,9 @@ page, so its styles keep the base they were made on). The looks before (Default 
       var b = n.box;
       if (x >= b[0] && x <= b[0] + b[2] && y >= b[1] && y <= b[1] + b[3] && (!best || b[2] * b[3] < best.box[2] * best.box[3])) best = n;
     });
+    // MINERVA zips (Pathway Forge): an element that only links to a submap (an overview picture's area, a box over a
+    // picture) opens it at once; one with its own record shows the link in its panel (renderInfo)
+    if (best && best.submap && !(best.props && best.props.length) && byId[best.submap]) { location.hash = best.submap; return; }
     sel = setting('click-closes') && best === sel ? null : best; // with --m2-click-closes a second click unselects (user, 2026-11-09)
     member = -1;
     renderInfo();
@@ -2028,6 +2031,11 @@ page, so its styles keep the base they were made on). The looks before (Default 
     x.addEventListener('click', closeInfo);
     head.appendChild(h); head.appendChild(x); info.appendChild(head);
     if (sel.reaction) { reaction(sel); return; }
+    if (sel.submap && byId[sel.submap]) {   // MINERVA zips (Pathway Forge): the submap this element opens
+      var sp = el('p'), sa = el('a', null, sel.submapTitle || byId[sel.submap].title);
+      sa.href = '#' + sel.submap;
+      sp.appendChild(el('span', 'm2-k', 'Opens submap ')); sp.appendChild(sa); info.appendChild(sp);
+    }
     if (!family) {
       // the symbol also where the title is the symbol (AKT1), so the line always looks the same
       // (user, 2026-10-18)
