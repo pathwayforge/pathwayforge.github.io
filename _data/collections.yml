@@ -45,3 +45,7 @@
   name: Atlas of Cancer Signalling Network (ACSN 2.0)
   path: /acsn/
   accent: "#4f6273"
+- id: air-zip
+  name: AIR (MINERVA zip)
+  path: /air-zip/
+  accent: "#5f6b78"
