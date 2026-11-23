@@ -51,6 +51,10 @@
   name: AIR (MINERVA zip)
   path: /air-zip/
   accent: "#985d71"
+- id: ours
+  name: Our maps (Activity Flow)
+  path: /ours/
+  accent: "#38816d"
 - id: sbml
   name: SBML with layout
   path: /sbml/

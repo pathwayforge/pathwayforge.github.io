@@ -1,0 +1,13 @@
+---
+layout: default
+title: Our maps (Activity Flow)
+permalink: /ours/
+collection: ours
+---
+{% comment %}
+A closed page: the Activity Flow maps our PD-to-AF converter makes from Process Description maps, each twice: as the
+converter draws it (straight lines) and with its lines routed orthogonally by libavoid, the boxes kept in place. The maps
+are in the organisation's private data repository (closed/ours/), read through GitHub's API after sign-in with the
+site's token.
+{% endcomment %}
+{% include atlas-app.html index="/ours/index.json" search="/ours/atlas-data/search.json" name="Our maps (Activity Flow)" closed="ours" %}
