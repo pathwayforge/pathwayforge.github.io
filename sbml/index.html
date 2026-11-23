@@ -1,0 +1,13 @@
+---
+layout: default
+title: SBML with layout
+permalink: /sbml/
+collection: sbml
+---
+{% comment %}
+A closed page: SBML files that carry a layout, drawn by the viewer from the files alone. CaSQ's SBML-qual models of
+Parkinson's disease maps beside their CellDesigner originals and a copy each with its layout tidied, Boolean and kinetic
+models from BioModels, and SBML exported by MINERVA and Reactome. The maps are in the organisation's private data
+repository (closed/sbml/), read through GitHub's API after sign-in with the site's token.
+{% endcomment %}
+{% include atlas-app.html index="/sbml/index.json" search="/sbml/atlas-data/search.json" name="SBML with layout" closed="sbml" %}
