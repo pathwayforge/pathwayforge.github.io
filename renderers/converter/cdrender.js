@@ -1,8 +1,9 @@
-// cdrender in JavaScript (2026-11-13): the same drawing as cdrender.py byte for byte (tests/cd-compare.js), for the
-// editor in the browser and the viewer's build (renderers/render.js), the master since 2026-11-13 (user: JavaScript the master for the viewer's own build and the editor).
-// cdrender.py beside it is its twin for the Python tools elsewhere; a change is made in both in the same commit. With it the four helpers it takes from the converter (cd_layout's ANCHOR, ANGLE,
-// SQUARE, anchor_point, from_frame, to_frame and celldesigner's plain_name), and Python's number writing (py below),
-// shared with cd_edit.js. The rules and their reasons are in cdrender.py under the same names; comments here are short.
+// cdrender, the CellDesigner renderer: the editor in the browser and the viewer's build (renderers/render.js) draw with
+// it. The one master (a Python twin it once had is retired); its drawings on the test set are compared with
+// the previous release's (tests/cd-compare.js). With it the four helpers it takes from the converter (cd_layout's ANCHOR, ANGLE,
+// SQUARE, anchor_point, from_frame, to_frame and celldesigner's plain_name), and Python's number writing (py below, so
+// its numbers read as the converter's), shared with cd_edit.js. The rules and their reasons are in cdrender-rules.md
+// beside it under the same names (snake_case there); comments here are short.
 //   browser: cdrender.render(text, { classes, groups }) -> svg;  cdrender.renderHits(text, opt) -> [svg, hits]
 //   node:    node renderers/converter/cdrender.js map.xml out.svg   (needs @xmldom/xmldom)
 (function (root) {
@@ -89,6 +90,7 @@
     return parseInt(t, 10);
   }
   function escape(s) { return String(s).replace(/&/g, '&amp;').replace(/>/g, '&gt;').replace(/</g, '&lt;'); }
+  function attr(s) { return escape(s).replace(/"/g, '&quot;'); }   // a value between double quotes
   var py = { fixed: fixed, round: round, repr: repr, pmod: pmod, F: F, I: I, escape: escape, hypot: hypot };
 
   // ---- the XML, as the lxml calls of the Python read it ----
@@ -173,11 +175,22 @@
     for (var ch of s) { var c = ch.codePointAt(0); t += c >= 32 && c < 127 ? WIDTHS[c - 32] : 556; }
     return t * size / 1000;
   }
-  function colour(c, dflt) { return c ? ['#' + c.slice(2), parseInt(c.slice(0, 2), 16) / 255] : [dflt || '#000000', 1.0]; }
+  function colour(c, dflt) { return c && /^[0-9a-fA-F]{8}$/.test(c) ? ['#' + c.slice(2), parseInt(c.slice(0, 2), 16) / 255] : [dflt || '#000000', 1.0]; }   // anything but eight hex digits as none: a file's text never reaches an attribute
   function fmt(v) { return fixed(v, 2).replace(/0+$/, '').replace(/\.$/, ''); }
   function pts(p) { return p.map(function (q) { return fmt(q[0]) + ',' + fmt(q[1]); }).join(' '); }
   function editPoints(s) { return (s || '').split(/\s+/).filter(function (q) { return q; }).map(function (q) { return q.split(',').map(F); }); }
   function unit(dx, dy) { var L = hypot(dx, dy) || 1; return [dx / L, dy / L]; }
+  function counts(rx) {   // a reactant's or product's stoichiometry other than 1 (SBGN's cardinality), by r: or p: and its alias (counts in cdrender-rules.md)
+    var out = {};
+    [['s:listOfReactants', 'r'], ['s:listOfProducts', 'p']].forEach(function (lk) {
+      findall(rx, lk[0] + '/s:speciesReference').forEach(function (sr) {
+        var v = get(sr, 'stoichiometry'), a = findtext(sr, 's:annotation/cd:extension/cd:alias', null), n = v === null ? NaN : Number(v);
+        if (v === null || String(v).trim() === '' || !isFinite(n) || a === null || !(n > 0) || n === 1) return;
+        out[lk[1] + ':' + a] = String(n);   // as the converter's count_text writes it (2.50: 2.5)
+      });
+    });
+    return out;
+  }
   function ellipse(x, y, w, h, n) {
     n = n || 48; var o = [];
     for (var i = 0; i < n; i++) o.push([x + w / 2 * (1 + Math.cos(2 * Math.PI * i / n)), y + h / 2 * (1 + Math.sin(2 * Math.PI * i / n))]);
@@ -196,7 +209,7 @@
     if (cls === 'RECEPTOR') return [[x, y], [x + w / 2, y + h / 5], [x + w, y], [x + w, y + h * 4 / 5], [x + w / 2, y + h], [x, y + h * 4 / 5]];
     return [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
   }
-  function enter(shapes, Q, P) {   // cdrender.py's enter: the first state variable or unit of information on the way in
+  function enter(shapes, Q, P) {   // enter in cdrender-rules.md: the first state variable or unit of information on the way in
     var dx = P[0] - Q[0], dy = P[1] - Q[1], best = null;
     shapes.forEach(function (s) {
       var t;
@@ -267,6 +280,13 @@
     });
     this.cnames = {};
     findall(model, 's:listOfCompartments/s:compartment').forEach(function (c) { self.cnames[get(c, 'id')] = get(c, 'name') || get(c, 'id'); });
+    // a compartment drawn as a picture (MINERVA's glyphs: 'Glyph: glyphs/x.png' in its notes): opt.glyph gives the
+    // picture's address for that path, or nothing; with no opt.glyph every compartment is drawn as lines
+    this.glyph = {};
+    if (opt.glyph) findall(model, 's:listOfCompartments/s:compartment').forEach(function (c) {
+      var n = find(c, 's:notes'), m = n && /Glyph:\s*(.+?\.png)/i.exec(n.textContent || ''), href = m && opt.glyph(m[1]);
+      if (href) self.glyph[get(c, 'id')] = href;
+    });
     this.alias = new Map();
     findall(ext, 'cd:listOfComplexSpeciesAliases/cd:complexSpeciesAlias').concat(findall(ext, 'cd:listOfSpeciesAliases/cd:speciesAlias')).forEach(function (a) {
       if (!species.has(get(a, 'species'))) throw new Error('KeyError: ' + get(a, 'species'));
@@ -278,39 +298,83 @@
   }
   var D = Drawing.prototype;
   D.al = function (i) { if (!this.alias.has(i)) throw new Error('KeyError: ' + i); return this.alias.get(i); };
+  // a compartment's two lines and the band between them, its colour at a quarter (a light colour's lines in black): the
+  // map's drawing and the editor's sign dragged from the palette, so a compartment keeps its look on the drop
+  function compartmentShape(x, y, w, h, t, ow, iw, fill, oval) {
+    var rgb = [1, 3, 5].map(function (k) { return parseInt(fill.slice(k, k + 2), 16); }), ink = Math.min.apply(null, rgb) > 230 ? '#000' : fill;
+    if (oval) return ['<ellipse cx="' + fmt(x + w / 2) + '" cy="' + fmt(y + h / 2) + '" rx="' + fmt(w / 2 - t / 2) + '" ry="' + fmt(h / 2 - t / 2) + '" fill="none" stroke="' + fill + '" stroke-opacity="0.25" stroke-width="' + fmt(t) + '"/>',
+      '<ellipse cx="' + fmt(x + w / 2) + '" cy="' + fmt(y + h / 2) + '" rx="' + fmt(w / 2) + '" ry="' + fmt(h / 2) + '" fill="none" stroke="' + ink + '" stroke-width="' + fmt(ow) + '"/>',
+      '<ellipse cx="' + fmt(x + w / 2) + '" cy="' + fmt(y + h / 2) + '" rx="' + fmt(w / 2 - t) + '" ry="' + fmt(h / 2 - t) + '" fill="none" stroke="' + ink + '" stroke-width="' + fmt(iw) + '"/>'].join('\n');
+    var ri = Math.max(20 - t, 0);   // inner corners concentric with the outer ones
+    return ['<path d="' + rrect(x, y, w, h, 20) + ' ' + rrect(x + t, y + t, w - 2 * t, h - 2 * t, ri) + '" fill="' + fill + '" fill-opacity="0.25" fill-rule="evenodd"/>',
+      '<rect x="' + fmt(x) + '" y="' + fmt(y) + '" width="' + fmt(w) + '" height="' + fmt(h) + '" rx="20" fill="none" stroke="' + ink + '" stroke-width="' + fmt(ow) + '"/>',
+      '<rect x="' + fmt(x + t) + '" y="' + fmt(y + t) + '" width="' + fmt(w - 2 * t) + '" height="' + fmt(h - 2 * t) + '" rx="' + fmt(ri) + '" fill="none" stroke="' + ink + '" stroke-width="' + fmt(iw) + '"/>'].join('\n');
+  }
   D.compartments = function () {
     var self = this, cs = findall(this.ext, 'cd:listOfCompartmentAliases/cd:compartmentAlias');
-    var key = function (a) { var b = find(a, 'cd:bounds'); return -F(get(b, 'w')) * F(get(b, 'h')); };
+    var key = function (a) { var b = find(a, 'cd:bounds'); return b ? -F(get(b, 'w')) * F(get(b, 'h')) : 0; };   // a close-up compartment (SQUARE_CLOSEUP_*) has a point, no bounds
     cs = cs.map(function (a) { return [a, key(a)]; }).sort(function (p, q) { return p[1] - q[1]; }).map(function (p) { return p[0]; });
     cs.forEach(function (a) {
-      var b = find(a, 'cd:bounds');
-      if (!b) return;
-      if (self.GROUPS) self.out.push('<g data-n="' + escape(get(a, 'id')) + '">');
-      var x = F(get(b, 'x')), y = F(get(b, 'y')), w = F(get(b, 'w')), h = F(get(b, 'h'));
-      var dl = find(a, 'cd:doubleLine');
-      var t = dl ? F(get(dl, 'thickness', 12)) : 12, ow = dl ? F(get(dl, 'outerWidth', 2)) : 2, iw = dl ? F(get(dl, 'innerWidth', 1)) : 1;
-      var fill = colour(get(find(a, 'cd:paint'), 'color'))[0];
-      var rgb = [1, 3, 5].map(function (k) { return parseInt(fill.slice(k, k + 2), 16); }), ink = Math.min.apply(null, rgb) > 230 ? '#000' : fill;
-      if (text(find(a, 'cd:class')) === 'OVAL') {
-        self.out.push('<ellipse cx="' + fmt(x + w / 2) + '" cy="' + fmt(y + h / 2) + '" rx="' + fmt(w / 2 - t / 2) + '" ry="' + fmt(h / 2 - t / 2) + '" fill="none" stroke="' + fill + '" stroke-opacity="0.25" stroke-width="' + fmt(t) + '"/>');
-        self.out.push('<ellipse cx="' + fmt(x + w / 2) + '" cy="' + fmt(y + h / 2) + '" rx="' + fmt(w / 2) + '" ry="' + fmt(h / 2) + '" fill="none" stroke="' + ink + '" stroke-width="' + fmt(ow) + '"/>');
-        self.out.push('<ellipse cx="' + fmt(x + w / 2) + '" cy="' + fmt(y + h / 2) + '" rx="' + fmt(w / 2 - t) + '" ry="' + fmt(h / 2 - t) + '" fill="none" stroke="' + ink + '" stroke-width="' + fmt(iw) + '"/>');
-      } else {
-        self.out.push('<path d="' + rrect(x, y, w, h, 20) + ' ' + rrect(x + t, y + t, w - 2 * t, h - 2 * t, 14) + '" fill="' + fill + '" fill-opacity="0.25" fill-rule="evenodd"/>');
-        self.out.push('<rect x="' + fmt(x) + '" y="' + fmt(y) + '" width="' + fmt(w) + '" height="' + fmt(h) + '" rx="20" fill="none" stroke="' + ink + '" stroke-width="' + fmt(ow) + '"/>');
-        self.out.push('<rect x="' + fmt(x + t) + '" y="' + fmt(y + t) + '" width="' + fmt(w - 2 * t) + '" height="' + fmt(h - 2 * t) + '" rx="14" fill="none" stroke="' + ink + '" stroke-width="' + fmt(iw) + '"/>');
-      }
-      var np = find(a, 'cd:namePoint');
-      if (np) self.nameLines(has(self.cnames, get(a, 'compartment')) ? self.cnames[get(a, 'compartment')] : '').forEach(function (line, k) {
-        self.text(line, F(get(np, 'x')), F(get(np, 'y')) + 15.5 + 14 * k, 12, 'start');
-      });
+      if (!find(a, 'cd:bounds')) return;
+      if (self.GROUPS) self.out.push('<g data-n="' + attr(get(a, 'id')) + '">');
+      self.compartment(a);
       if (self.GROUPS) self.out.push('</g>');
+    });
+  };
+  // one compartment, at its bounds or at box (the editor's live drawing of one growing during a drag: its name moved
+  // with its corner, as cd_edit's place() moves the namePoint)
+  D.compartment = function (a, box) {
+    var self = this, b = find(a, 'cd:bounds'), x0 = F(get(b, 'x')), y0 = F(get(b, 'y'));
+    var x = box ? box[0] : x0, y = box ? box[1] : y0, w = box ? box[2] : F(get(b, 'w')), h = box ? box[3] : F(get(b, 'h'));
+    var dl = find(a, 'cd:doubleLine');
+    var t = dl ? F(get(dl, 'thickness', 12)) : 12, ow = dl ? F(get(dl, 'outerWidth', 2)) : 2, iw = dl ? F(get(dl, 'innerWidth', 1)) : 1;
+    var pic = has(self.glyph, get(a, 'compartment')) ? self.glyph[get(a, 'compartment')] : null;
+    self.out.push(pic ? '<image href="' + escape(pic).replace(/"/g, '&quot;') + '" x="' + fmt(x) + '" y="' + fmt(y) + '" width="' + fmt(w) + '" height="' + fmt(h) + '" preserveAspectRatio="none"/>'
+      : compartmentShape(x, y, w, h, t, ow, iw, colour(get(find(a, 'cd:paint'), 'color'))[0], text(find(a, 'cd:class')) === 'OVAL'));
+    var np = find(a, 'cd:namePoint'), nm = has(self.cnames, get(a, 'compartment')) ? self.cnames[get(a, 'compartment')] : '';
+    // a name at the top middle of its bounds stays at the top middle of a live box (cd_edit's place() keeps it so)
+    // a name at one of the nine places stays there in a live box; one at the top middle by an older rule stays centred
+    var b0 = [x0, y0, F(get(b, 'w')), F(get(b, 'h'))], oval = text(find(a, 'cd:class')) === 'OVAL', pl = np && box && namePlaceOf(b0, nm, t, [F(get(np, 'x')), F(get(np, 'y'))], oval, true), at = pl && namePoint(box, nm, t, pl, oval);
+    var nx = at ? at[0] : np && box && Math.abs(F(get(np, 'x')) - nameLeft(b0, nm)) < 1 ? nameLeft(box, nm) : np && F(get(np, 'x')) + (x - x0);
+    var ny = at ? at[1] : np && F(get(np, 'y')) + (y - y0);
+    if (np) self.nameLines(nm).forEach(function (line, k) {
+      self.text(line, nx, ny + 15.5 + 14 * k, 12, 'start');
     });
   };
   D.text = function (s, x, y, size, anchor, family, extra) {
     if (size === undefined) size = 12;
     this.out.push('<text x="' + fmt(x) + '" y="' + fmt(y) + '" font-family="' + (family || FONT) + '" font-size="' + fmt(size) + '" text-anchor="' + (anchor || 'middle') + '"' + (extra || '') + '>' + escape(s) + '</text>');
   };
+  // the left of a compartment's name (its namePoint x, where the text starts) that puts it at the top middle of box: its
+  // widest line centred (the name drawn at 12, as D.compartment draws it)
+  function nameLeft(box, name) {
+    var w = Math.max.apply(null, plainName(name || '').split('_br_').join('\n').split('\n').map(function (l) { return width(l, 12); }));
+    return box[0] + box[2] / 2 - w / 2;
+  }
+  // a compartment's name at one of nine places in box (NAME_PLACES: top left, top, top right, left, centre, right,
+  // bottom left, bottom, bottom right), as CellDesigner 4.4 leaves a name dragged to an edge: its box (the widest line,
+  // 23 high and 14 more a line) the membrane's thickness + 5 from a side and + 0.5 from the top and bottom (17 and 12.5
+  // at its default 12), centred otherwise; on an oval a corner's box has its outer corner on the inner ellipse, at 45
+  // degrees from the centre. The namePoint is the box's top left, to 0.1 (CellDesigner writes halves)
+  var NAME_PLACES = ['tl', 't', 'tr', 'l', 'c', 'r', 'bl', 'b', 'br'];
+  function namePoint(box, name, th, p, oval) {
+    var ls = plainName(name || '').split('_br_').join('\n').split('\n'), w = Math.max.apply(null, ls.map(function (l) { return width(l, 12); })), h = 23 + 14 * (ls.length - 1);
+    var c = p.slice(-1), r = p.charAt(0), x, y;
+    if (oval && p.length === 2) {
+      var cx = box[0] + box[2] / 2, cy = box[1] + box[3] / 2, a = Math.max(box[2] / 2 - th, 0) / Math.SQRT2, e = Math.max(box[3] / 2 - th, 0) / Math.SQRT2;
+      x = c === 'l' ? cx - a : cx + a - w; y = r === 't' ? cy - e : cy + e - h;
+    } else {
+      x = c === 'l' ? box[0] + th + 5 : c === 'r' ? box[0] + box[2] - th - 5 - w : box[0] + box[2] / 2 - w / 2;
+      y = r === 't' ? box[1] + th + 0.5 : r === 'b' ? box[1] + box[3] - th - 0.5 - h : box[1] + box[3] / 2 - h / 2;
+    }
+    return [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
+  }
+  // which of the nine places a namePoint is at (within 1 on each axis), else null; one: null also where two or more
+  // places meet there (a box too short or narrow to tell them apart), so a move or resize keeps the name as it is
+  function namePlaceOf(box, name, th, np, oval, one) {
+    var hit = NAME_PLACES.filter(function (p) { var q = namePoint(box, name, th, p, oval); return Math.abs(q[0] - np[0]) < 1 && Math.abs(q[1] - np[1]) < 1; });
+    return hit.length && !(one && hit.length > 1) ? hit[0] : null;
+  }
   D.nameLines = function (name) { return plainName(name || '').split('_br_').join('\n').split('\n'); };
   D.species = function () {
     var self = this, depth = new Map();
@@ -321,7 +385,7 @@
     var order = Array.from(this.alias.keys()).map(function (i) { return [i, self.alias.get(i)[0] !== 'COMPLEX' ? 1 : 0, d(i)]; })
       .sort(function (p, q) { return p[1] - q[1] || p[2] - q[2]; }).map(function (p) { return p[0]; });
     order.forEach(function (i) {
-      if (self.GROUPS) self.out.push('<g data-n="' + escape(i) + '">');
+      if (self.GROUPS) self.out.push('<g data-n="' + attr(i) + '">');
       self.node(i);
       if (self.GROUPS) self.out.push('</g>');
     });
@@ -329,7 +393,7 @@
   D.node = function (i) {
     var A = this.alias.get(i), cls = A[0], x = A[1][0], y = A[1][1], w = A[1][2], h = A[1][3], a = A[2], name = A[3], si = A[4], self = this;
     var hd = find(si, 'cd:state/cd:homodimer'), n = hd ? I(text(hd)) : 1;
-    var paint = find(a, 'cd:usualView/cd:paint'), c = colour(paint ? get(paint, 'color') : 'ffffffff'), fill = c[0], alpha = c[1];
+    var paint = find(a, 'cd:usualView/cd:paint'), c = colour(paint ? get(paint, 'color') : 'ffffffff', '#ffffff'), fill = c[0], alpha = c[1];   // a paint that is no colour: white, as none
     var hyp = find(si, 'cd:hypothetical');
     var dash = hyp && text(hyp) === 'true' ? ' stroke-dasharray="5,3"' : '';
     var sl = find(a, 'cd:usualView/cd:singleLine');
@@ -347,7 +411,7 @@
       var lines = cls !== 'DEGRADED' ? this.nameLines(name) : [];
       var cy = y + fh / 2 - z * 7 / 12 * (lines.length - 1), mid = cls === 'ION_CHANNEL' ? x + (fw - 20) / 2 : x + fw / 2;
       lines.forEach(function (line, k2) { self.text(line, mid, cy + z / 3 + z * 7 / 6 * k2, z, 'middle', null, self.CLASSES ? ' class="t-' + (ROLE[cls] || 'white') + '"' : ''); });
-    } else this.text(this.nameLines(name).join(' '), x + fw / 2, y + fh - z * 7 / 12, z, 'middle', null, this.CLASSES ? ' class="t-complex"' : '');
+    } else this.text(this.nameLines(name).join(' '), x + fw / 2, y + fh - 7, z, 'middle', null, this.CLASSES ? ' class="t-complex"' : '');
   };
   D.shape = function (cls, b, fill, alpha, dash) {
     var x = b[0], y = b[1], w = b[2], h = b[3], self = this;
@@ -377,22 +441,26 @@
     var pref = find(si, 'cd:proteinReference'), mods = new Map();
     findall(si, 'cd:state/cd:listOfModifications/cd:modification').forEach(function (m) { mods.set(get(m, 'residue'), m); });
     var pid = pref ? text(pref) : null;
-    var siteName = function (site, px, py) {
+    // a residue's name inside the shape, as CellDesigner 4.4 draws it (its PDF of residues all round four proteins): at
+    // the same angle on the outline 9 in, 2 more in from a side the circle sits on, its middle level with that point;
+    // left-aligned left of the middle, right-aligned right of it, centred in the middle
+    var siteName = function (site, ang) {
       if (!site || !front) return;
-      var tw = width(site, 10), tx = px + (px <= x + 1 ? 11 : px >= x + w - 1 ? -11 : 0), ty = py + (py < y + h / 2 ? 11 : -11);
-      tx = Math.min(Math.max(tx, x + 2 + tw / 2), x + w - 2 - tw / 2);
-      self.text(site, tx, ty + 3.5, 10);
+      var e = 1e-6, o = onBorder(b, ang), fx = w ? (o[0] - x) / w - 0.5 : 0, fy = h ? (o[1] - y) / h - 0.5 : 0;
+      var p = onBorder([x + 9, y + 9, Math.max(w - 18, 0), Math.max(h - 18, 0)], ang);
+      var tx = p[0] + (fx <= -0.5 + e ? 2 : fx >= 0.5 - e ? -2 : 0), ty = p[1] + (fy <= -0.5 + e ? 2 : fy >= 0.5 - e ? -2 : 0);
+      self.text(site, tx, ty + 3.5, 10, fx < -e ? 'start' : fx > e ? 'end' : 'middle', undefined, ' class="sv-site" display="none"');   // hidden unless Show sites
     };
     this.residues.forEach(function (r) {
       if (r[2] === pid && !mods.has(r[3])) {
         var p = onBorder(b, r[0]);
         self.out.push('<circle cx="' + fmt(p[0]) + '" cy="' + fmt(p[1]) + '" r="8" fill="#fff" stroke="#000"/>');
-        siteName(r[1], p[0], p[1]);
+        siteName(r[1], r[0]);
       }
     });
     mods.forEach(function (m) {
       var r = self.residues.get(pid + '\u0001' + get(m, 'residue')) || [0.0, null], p = onBorder(b, r[0]);
-      siteName(r[1], p[0], p[1]);
+      siteName(r[1], r[0]);
       self.out.push('<circle cx="' + fmt(p[0]) + '" cy="' + fmt(p[1]) + '" r="8" fill="#fff" stroke="#000"/>');
       var sym = has(SYMBOL, get(m, 'state')) ? SYMBOL[get(m, 'state')] : get(m, 'state');
       if (sym) self.text(sym, p[0], p[1] + 3.5, 9, 'middle', 'sans-serif');
@@ -400,7 +468,7 @@
     findall(si, 'cd:state/cd:listOfStructuralStates/cd:structuralState').forEach(function (st) {
       var sa = find(a, 'cd:structuralState'), ang = sa ? F(get(sa, 'angle')) : -Math.PI / 2, p = onBorder(b, ang), label = get(st, 'structuralState');
       self.out.push('<ellipse cx="' + fmt(p[0]) + '" cy="' + fmt(p[1]) + '" rx="' + Math.trunc(width(label, 10) / 2 + 12) + '" ry="8" fill="#fff" stroke="#000"/>');
-      self.text(label, p[0], p[1] + 3, 10);
+      self.text(label, p[0], p[1] + 3, 9);  // drawn at 9 (CellDesigner 4.4 PDF); the ellipse is sized from the text width at 10
     });
     var info = find(a, 'cd:info');
     if (front && info && get(info, 'state') === 'open') {
@@ -415,36 +483,40 @@
   D.box = function (i) { return this.al(i)[1]; };
   D.front = function (i) {
     var A = this.al(i), b = A[1], si = A[4], hd = si ? find(si, 'cd:state/cd:homodimer') : null, t = hd ? text(hd) : null;
-    var s = t && isdigit(t) ? 6 * (I(t) - 1) : 0;
-    return [b[0], b[1], b[2] - s, b[3] - s];
+    return frontBox(b, t && isdigit(t) ? I(t) : 1);
   };
+  function frontBox(b, n) { var s = 6 * (n - 1); return [b[0], b[1], b[2] - s, b[3] - s]; }   // a multimer of n drawn as its copies: the front one
   D.end = function (e, i) {
     var b = e ? find(e, 'cd:linkAnchor') : null, bx = this.box(i), x = bx[0], y = bx[1], w = bx[2], h = bx[3];
     var side = b ? get(b, 'position') : null;
     if (!side || !has(ANCHOR, side)) return [[x + w / 2, y + h / 2], false];
     return [this.at(i, side), true];
   };
-  D.at = function (i, side) {   // anchor side's point on alias i (cdrender.py's at)
-    var f = this.front(i), x = f[0], y = f[1], w = f[2], h = f[3];
-    var cls = this.al(i)[0];
+  D.at = function (i, side) { return anchorAt(this.al(i)[0], this.front(i), side); };   // anchor side's point on alias i (at in cdrender-rules.md)
+  function anchorAt(cls, f, side) {   // anchor side's point on a species of class cls drawn in box f (the editor's landing places too)
+    var x = f[0], y = f[1], w = f[2], h = f[3];
     if (cls === 'RNA') {
       var fx = ANCHOR[side][0], fy = ANCHOR[side][1];
       if (fy === 0 || fy === 1) return [x + (fy === 0 ? h : 0) + fx * (w - h), y + fy * h];
       return [fx === 0 ? x + h * (1 - fy) : x + w - h * fy, y + fy * h];
     }
+    if (cls === 'COMPLEX' && /^(NE|SE|SW|NW)$/.test(side)) {   // a corner on the middle of its cut (the cut 5)
+      var cx = ANCHOR[side][0], cy = ANCHOR[side][1];
+      return [x + cx * w + (cx === 0 ? 2.5 : -2.5), y + cy * h + (cy === 0 ? 2.5 : -2.5)];
+    }
     if (cls === 'DEGRADED') { x += w / 8; y += h / 8; w *= 3 / 4; h *= 3 / 4; }  // on its drawn circle, 3/4 of the box (AsthmaMap mast cell PDF: no gap)
     return anchorPoint([x, y, w, h], side, ROUND.indexOf(cls) >= 0, cls === 'PHENOTYPE');
-  };
-  D.clip = function (i, P, anchored, Q, shapeOnly) {   // the visual end (cdrender.py's clip)
+  }
+  D.clip = function (i, P, anchored, Q, shapeOnly) {   // the visual end (clip in cdrender-rules.md)
     if (!anchored) P = leave(outline(this.al(i)[0], this.box(i)), P, Q);
     return shapeOnly ? P : enter(this.extras(i), Q, P);
   };
-  D.ends = function (line, ra, pa) {   // cdrender.py's ends
+  D.ends = function (line, ra, pa) {   // ends in cdrender-rules.md
     var L = line.length, A = line[0], B = line[L - 1], A1 = line[1], B1 = line[L - 2];
     line[0] = enter(this.extras(ra), A1, A);
     line[L - 1] = enter(this.extras(pa), B1, B);
   };
-  D.extras = function (i) {   // cdrender.py's extras
+  D.extras = function (i) {   // extras in cdrender-rules.md
     var A = this.al(i), x = A[1][0], y = A[1][1], w = A[1][2], h = A[1][3], self = this;
     if (!this.extra.has(i)) {
       var a = A[2], si = A[4], hd = find(si, 'cd:state/cd:homodimer'), pref = find(si, 'cd:proteinReference'), pid = pref ? text(pref) : null;
@@ -465,7 +537,7 @@
     }
     return out;
   };
-  D.open = function (e) { if (this.GROUPS) { this.lines.push('<g data-e="' + escape(e) + '">'); this.halo.push('<g data-e="' + escape(e) + '">'); } };
+  D.open = function (e) { if (this.GROUPS) { this.lines.push('<g data-e="' + attr(e) + '">'); this.halo.push('<g data-e="' + attr(e) + '">'); } };
   D.close = function () { if (this.GROUPS) { this.lines.push('</g>'); this.halo.push('</g>'); } };
   D.path = function (p, col, wd, dash, startNode, endNode) {
     col = col || '#000'; if (wd === undefined) wd = 1.0; if (startNode === undefined) startNode = true; if (endNode === undefined) endNode = true;
@@ -484,17 +556,16 @@
     var line = function (p, q) { return '<line x1="' + fmt(p[0]) + '" y1="' + fmt(p[1]) + '" x2="' + fmt(q[0]) + '" y2="' + fmt(q[1]) + '" stroke="#000"/>'; };
     if (kind === 'production') { L.push('<polygon points="' + pts([T, at(15, 5), at(15, -5)]) + '" fill="#000"/>'); return at(14, 0); }
     if (kind === 'stimulation') { L.push('<polygon points="' + pts([T, at(8, 4), at(8, -4)]) + '" fill="#fff" stroke="#000"/>'); return at(8, 0); }
-    if (kind === 'stimulation-reduced') {
-      L.push('<polygon points="' + pts([T, at(15, 5), at(15, -5)]) + '" fill="#000"/>');
-      L.push('<polygon points="' + pts([at(4.8, 0), at(12, 2), at(12, -2)]) + '" fill="#fff"/>');
-      return at(15, 0);
+    if (kind === 'stimulation-reduced') {   // SBGN's open triangle, as yrender's white_delta
+      L.push('<polygon points="' + pts([T, at(16, 6), at(16, -6)]) + '" fill="#fff" stroke="#000"/>');
+      return at(16, 0);
     }
     if (kind === 'trigger') {
       L.push('<polygon points="' + pts([T, at(15, 5), at(15, -5)]) + '" fill="#fff" stroke="#000"/>');
       L.push(line(at(20, 4.5), at(20, -4.5)));
       return at(15, 0);
     }
-    if (kind === 'catalysis') { var c = at(6, 0); L.push('<circle cx="' + fmt(c[0]) + '" cy="' + fmt(c[1]) + '" r="3" fill="#fff" stroke="#000"/>'); return at(9, 0); }   // 2 px of white before the outline (user, 2026-11-14; CellDesigner's 4.5 left 0.5 px, 1 px not enough), as yrender
+    if (kind === 'catalysis') { var c = at(6, 0); L.push('<circle cx="' + fmt(c[0]) + '" cy="' + fmt(c[1]) + '" r="3" fill="#fff" stroke="#000"/>'); return at(9, 0); }   // 2 px of white before the outline (CellDesigner's 4.5 leaves 0.5 px, 1 px is not enough), as yrender
     if (kind === 'inhibition') { L.push(line(at(3, 6), at(3, -6))); return at(3, 0); }
     if (kind === 'modulation') { L.push('<polygon points="' + pts([T, at(5, 4), at(10, 0), at(5, -4)]) + '" fill="#fff" stroke="#000"/>'); return at(10, 0); }
     return T;
@@ -502,13 +573,26 @@
   D.reactions = function () {
     var self = this;
     findall(this.model, 's:listOfReactions/s:reaction').forEach(function (rx) {
-      self.cur = get(rx, 'id');
+      self.cur = (get(rx, 'id') || get(rx, 'metaid'));
       try { self.reaction(rx); }
-      catch (e) { self.log(get(rx, 'id') + ': ' + e.message); }
+      catch (e) { self.log((get(rx, 'id') || get(rx, 'metaid')) + ': ' + e.message); }
     });
   };
   var REDUCED_HEAD = { PHYSICAL_STIMULATION: 'stimulation-reduced', REDUCED_PHYSICAL_STIMULATION: 'stimulation-reduced', NEGATIVE_INFLUENCE: 'inhibition',
     REDUCED_MODULATION: 'modulation', REDUCED_TRIGGER: 'trigger', POSITIVE_INFLUENCE: 'production', CATALYSIS: 'catalysis', INHIBITION: 'inhibition' };
+  D.count = function (t, line) {   // a cardinality (the converter's layout.count_box): a box beside the middle of the participant's line, light grey (count in cdrender-rules.md)
+    var lens = [], tot = 0, k = 0, i;
+    for (i = 0; i + 1 < line.length; i++) { var ax = line[i + 1][0] - line[i][0], ay = line[i + 1][1] - line[i][1]; lens.push(Math.sqrt(ax * ax + ay * ay)); }
+    for (i = 0; i < lens.length; i++) tot += lens[i];
+    var half = tot / 2;
+    while (k < lens.length - 1 && half > lens[k]) { half -= lens[k]; k++; }
+    var L = lens[k] || 1, ux = lens[k] ? (line[k + 1][0] - line[k][0]) / L : 1, uy = lens[k] ? (line[k + 1][1] - line[k][1]) / L : 0, nx = -uy, ny = ux;
+    if (Math.abs(ny) < 0.2 ? nx < 0 : ny > 0) { nx = -nx; ny = -ny; }
+    var w = 5 * t.length + 6, h = 11, b = 1 + Math.abs(nx) * w / 2 + Math.abs(ny) * h / 2;
+    var cx = line[k][0] + ux * half + nx * b, cy = line[k][1] + uy * half + ny * b;
+    this.lines.push('<rect x="' + fmt(cx - w / 2) + '" y="' + fmt(cy - h / 2) + '" width="' + fmt(w) + '" height="' + fmt(h) + '" fill="#fff" stroke="#9aa0a6" stroke-width="0.8"/>' +
+      '<text x="' + fmt(cx) + '" y="' + fmt(cy + 3.2) + '" font-family="' + FONT + '" font-size="9" fill="#9aa0a6" text-anchor="middle">' + escape(t) + '</text>');
+  };
   D.reaction = function (rx) {
     var x = find(rx, 's:annotation/cd:extension'), typ = text(find(x, 'cd:reactionType'));
     var br = findall(x, 'cd:baseReactants/cd:baseReactant'), bp = findall(x, 'cd:baseProducts/cd:baseProduct');
@@ -544,27 +628,31 @@
     k = Math.min(k, L - 2);
     var P = line[k], Q = line[k + 1], sq = [(P[0] + Q[0]) / 2, (P[1] + Q[1]) / 2], fl = unit(Q[0] - P[0], Q[1] - P[1]);
     this.ends(line, ra, pa);
-    var reversible = get(rx, 'reversible') !== 'false';
+    var reversible = get(rx, 'reversible') !== 'false', nums = counts(rx);
     u = unit(line[L - 1][0] - line[L - 2][0], line[L - 1][1] - line[L - 2][1]);
     if (this.GROUPS) {
       this.open(this.cur + '|a');
       var half = line.slice(0, k + 1).concat([sq]);
       if (reversible) half[0] = this.head('production', line[0], unit(line[0][0] - line[1][0], line[0][1] - line[1][1]));
       this.path(half, col, wd, dash, true, false);
+      if (nums.hasOwnProperty('r:' + ra)) this.count(nums['r:' + ra], line.slice(0, k + 1).concat([sq]));
       this.close();
       this.open(this.cur + '|b');
       half = [sq].concat(line.slice(k + 1));
       half[half.length - 1] = this.head('production', line[L - 1], u);
       this.path(half, col, wd, dash, false, true);
+      if (nums.hasOwnProperty('p:' + pa)) this.count(nums['p:' + pa], line.slice(k + 1).reverse().concat([sq]));
       this.close();
-      this.linksAndModifiers(x, P, Q, sq, fl, col, wd, dash, typ);
+      this.linksAndModifiers(x, P, Q, sq, fl, col, wd, dash, typ, nums);
       return;
     }
     var main = line.slice();
     main[L - 1] = this.head('production', line[L - 1], u);
     if (reversible) main[0] = this.head('production', line[0], unit(line[0][0] - line[1][0], line[0][1] - line[1][1]));
     this.path(main, col, wd, dash);
-    this.linksAndModifiers(x, P, Q, sq, fl, col, wd, dash, typ);
+    if (nums.hasOwnProperty('r:' + ra)) this.count(nums['r:' + ra], line.slice(0, k + 1).concat([sq]));
+    if (nums.hasOwnProperty('p:' + pa)) this.count(nums['p:' + pa], line.slice(k + 1).reverse().concat([sq]));
+    this.linksAndModifiers(x, P, Q, sq, fl, col, wd, dash, typ, nums);
   };
   D.branched = function (rx, x, typ, br, bp, ep, q, col, wd) {
     var self = this, ends = br.concat(bp);
@@ -607,26 +695,35 @@
     if (!top.length) throw new Error('a logic gate without its gate, not drawn');
     var gp = editPoints(get(top[0], 'editPoints')), G = gp[gp.length - 1], gbend = gp.slice(0, -1);
     if (!G) throw new Error('IndexError: list index out of range');
-    gm.forEach(function (g) {
+    gm.forEach(function (g, j) {
       if (top.indexOf(g) >= 0 || !self.alias.has(get(g, 'aliases'))) return;
       var i = get(g, 'aliases'), Mm = self.end(find(g, 'cd:linkTarget'), i), M = Mm[0];
       var seq = [M].concat(editPoints(get(g, 'editPoints')).map(function (p) { return fromFrame(M, G, p); }), [G]);
       seq[0] = self.clip(i, M, Mm[1], seq[1]);
       var L = seq.length, u = unit(seq[L - 1][0] - seq[L - 2][0], seq[L - 1][1] - seq[L - 2][1]);
       seq[L - 1] = [G[0] - 6.5 * u[0], G[1] - 6.5 * u[1]];
+      self.open(self.cur + '|i' + j);
       self.path(seq, col, wd, false, true, false);
+      self.close();
     });
     var pa = get(prod, 'alias'), Bb = this.end(prod, pa), B = Bb[0];
     var seq = [G].concat(gbend.map(function (p) { return fromFrame(G, B, p); }), [B]), L = seq.length;
     seq[L - 1] = B = this.clip(pa, B, Bb[1], seq[L - 2]);
     var u = unit(B[0] - seq[L - 2][0], B[1] - seq[L - 2][1]);
-    var stop = this.head(GATE_HEAD[get(top[0], 'modificationType')] || 'stimulation', B, u);
+    var ot = get(top[0], 'modificationType'), stop = this.head(GATE_HEAD[ot] || REDUCED_HEAD[ot] || 'stimulation', B, u);
     var u0 = unit(seq[1][0] - G[0], seq[1][1] - G[1]);
+    this.open(this.cur + '|a');
     this.path([[G[0] + 6 * u0[0], G[1] + 6 * u0[1]]].concat(seq.slice(1, -1), [stop]), col, wd, false, false, true);
-    var t = get(top[0], 'type');
-    this.lines.push('<circle cx="' + fmt(G[0]) + '" cy="' + fmt(G[1]) + '" r="6" fill="#fff" stroke="#000"/>');
+    this.close();
     this.hit(this.cur).at = [round(G[0], 1), round(G[1], 1)];
-    this.lines.push('<text x="' + fmt(G[0]) + '" y="' + fmt(G[1] + 4) + '" font-family="sans-serif" font-size="11" text-anchor="middle">' + (GATE[t.slice(t.lastIndexOf('_') + 1)] || '?') + '</text>');
+    this.lines.push(this.gate(G, get(top[0], 'type'), this.cur + '|g'));
+  };
+  // a gate: a circle with its sign; in the editor's drawing (GROUPS) a group of its own, its node's id ('<reaction>|g'
+  // between entities, '<reaction>|g<n>' for the reaction's modification n), as cd_edit's GraphML has it
+  D.gate = function (G, t, id) {
+    var g = '<circle cx="' + fmt(G[0]) + '" cy="' + fmt(G[1]) + '" r="6" fill="#fff" stroke="#000"/>' + (this.GROUPS ? '' : '\n') +
+      '<text x="' + fmt(G[0]) + '" y="' + fmt(G[1] + 4) + '" font-family="sans-serif" font-size="11" text-anchor="middle">' + (GATE[t.slice(t.lastIndexOf('_') + 1)] || '?') + '</text>';
+    return this.GROUPS ? '<g data-n="' + attr(id) + '">' + g + '</g>' : g;
   };
   var HEADS = { CATALYSIS: 'catalysis', UNKNOWN_CATALYSIS: 'catalysis', INHIBITION: 'inhibition', UNKNOWN_INHIBITION: 'inhibition',
     PHYSICAL_STIMULATION: 'stimulation', TRIGGER: 'trigger', MODULATION: 'modulation', TRANSCRIPTIONAL_ACTIVATION: 'stimulation',
@@ -635,7 +732,7 @@
     var tli = (get(m, 'targetLineIndex') || '-1,2').split(',')[1], k = I(tli), spot = has(SQUARE, k) ? SQUARE[k] : SQUARE[3];
     return [sq[0] + 5 * (spot[0] * fl[0] - spot[1] * fl[1]), sq[1] + 5 * (spot[0] * fl[1] + spot[1] * fl[0])];
   }
-  D.linksAndModifiers = function (x, P, Q, sq, fl, col, wd, dash, typ) {
+  D.linksAndModifiers = function (x, P, Q, sq, fl, col, wd, dash, typ, nums) {
     var self = this;
     var joins = [0.375, 0.625].map(function (t) { return [P[0] + t * (Q[0] - P[0]), P[1] + t * (Q[1] - P[1])]; });
     [['cd:listOfReactantLinks/cd:reactantLink', true], ['cd:listOfProductLinks/cd:productLink', false]].forEach(function (tg) {
@@ -648,13 +745,17 @@
         var bends = editPoints(get(l, 'editPoints') || findtext(l, 'cd:editPoints', '')).map(function (p) { return into ? fromFrame(O, J, p) : fromFrame(J, O, p); });
         var seq = [O].concat(into ? bends : bends.slice().reverse(), [J]);
         seq[0] = self.clip(i, O, Oo[1], seq[1]);
-        var lc = find(l, 'cd:line'), lcol = lc ? colour(get(lc, 'color'))[0] : col;
-        if (into) self.path(seq, lcol, wd, dash, true, false);
-        else {
+        var lc = find(l, 'cd:line'), lcol = lc ? colour(get(lc, 'color'))[0] : col, lwd = lc ? F(get(lc, 'width', wd)) : wd;   // an added reactant or product in its own colour and width, as CellDesigner keeps one for each
+        var nk = (into ? 'r:' : 'p:') + i;
+        if (into) {
+          self.path(seq, lcol, lwd, dash, true, false);
+          if (nums && nums.hasOwnProperty(nk)) self.count(nums[nk], seq);
+        } else {
           seq = seq.reverse();
           var L = seq.length, w_ = unit(seq[L - 1][0] - seq[L - 2][0], seq[L - 1][1] - seq[L - 2][1]);
           var stop = self.head('production', seq[L - 1], w_);
-          self.path(seq.slice(0, -1).concat([stop]), lcol, wd, dash, false, true);
+          self.path(seq.slice(0, -1).concat([stop]), lcol, lwd, dash, false, true);
+          if (nums && nums.hasOwnProperty(nk)) self.count(nums[nk], seq.slice().reverse());
         }
         self.close();
       });
@@ -671,20 +772,23 @@
         if (!G) throw new Error('IndexError: list index out of range');
         a.split(',').forEach(function (i) {
           if (!self.alias.has(i)) return;
-          var own = mods.find(function (o) { return get(o, 'aliases') === i && get(o, 'type') === get(m, 'modificationType'); }) || null;
+          var k = mods.findIndex(function (o) { return get(o, 'aliases') === i && get(o, 'type') === get(m, 'modificationType'); }), own = k >= 0 ? mods[k] : null;
           var Cc = self.end(own ? find(own, 'cd:linkTarget') : null, i), c = Cc[0];
           var s2 = [c].concat((own ? editPoints(get(own, 'editPoints')) : []).map(function (p) { return fromFrame(c, G, p); }), [G]);
           s2[0] = self.clip(i, c, Cc[1], s2[1]);
           var L2 = s2.length, u2 = unit(G[0] - s2[L2 - 2][0], G[1] - s2[L2 - 2][1]);
           s2[L2 - 1] = [G[0] - 6.5 * u2[0], G[1] - 6.5 * u2[1]];
+          if (own) self.open(self.cur + '|m' + k);   // as cd_edit's edge from the input to the gate
           self.path(s2, col, wd, false, true, false);
+          if (own) self.close();
         });
         seq = [G].concat(gbend.map(function (p) { return fromFrame(G, T, p); }), [T]);
         u = unit(seq[seq.length - 1][0] - seq[seq.length - 2][0], seq[seq.length - 1][1] - seq[seq.length - 2][1]);
         stop = self.head(HEADS[get(m, 'modificationType')] || 'stimulation', T, u);
+        self.open(self.cur + '|m' + n);
         self.path(seq.slice(0, -1).concat([stop]), col, wd, false, false, false);
-        squares.push('<circle cx="' + fmt(G[0]) + '" cy="' + fmt(G[1]) + '" r="6" fill="#fff" stroke="#000"/>');
-        squares.push('<text x="' + fmt(G[0]) + '" y="' + fmt(G[1] + 4) + '" font-family="sans-serif" font-size="11" text-anchor="middle">' + (GATE[t.slice(t.lastIndexOf('_') + 1)] || '?') + '</text>');
+        self.close();
+        squares.push(self.gate(G, t, self.cur + '|g' + n));
         return;
       }
       if (gateInputs.has(a + '\u0001' + t) || !self.alias.has(a)) return;
@@ -695,14 +799,14 @@
       u = unit(seq[seq.length - 1][0] - seq[seq.length - 2][0], seq[seq.length - 1][1] - seq[seq.length - 2][1]);
       stop = self.head(HEADS[t] || 'stimulation', T, u);
       var mc = find(m, 'cd:line');
-      self.path(seq.slice(0, -1).concat([stop]), mc ? colour(get(mc, 'color'))[0] : col, wd, t.indexOf('UNKNOWN') === 0, true, false);
+      self.path(seq.slice(0, -1).concat([stop]), mc ? colour(get(mc, 'color'))[0] : col, mc ? F(get(mc, 'width', wd)) : wd, t.indexOf('UNKNOWN') === 0, true, false);
       self.close();
     });
     var ang = Math.atan2(fl[1], fl[0]) * 180 / Math.PI;
     var glyph = '<rect x="-5" y="-5" width="10" height="10" fill="#fff" stroke="#000" transform="translate(' + fmt(sq[0]) + ',' + fmt(sq[1]) + ') rotate(' + fmt(ang) + ')"/>';
     var mark = { UNKNOWN_TRANSITION: '?', KNOWN_TRANSITION_OMITTED: '//' }[typ];
     if (mark) glyph += '<text x="' + fmt(sq[0]) + '" y="' + fmt(sq[1] + 3) + '" font-family="\'Times New Roman\', serif" font-weight="bold" font-size="10" text-anchor="middle">' + mark + '</text>';
-    this.lines.push(this.GROUPS ? '<g data-n="' + escape(this.cur) + '|proc">' + glyph + '</g>' : glyph);
+    this.lines.push(this.GROUPS ? '<g data-n="' + attr(this.cur) + '|proc">' + glyph + '</g>' : glyph);
     if (this.cur) this.hit(this.cur).at = [round(sq[0], 1), round(sq[1], 1)];
     squares.forEach(function (s) { self.lines.push(s); });
   };
@@ -734,7 +838,7 @@
     return [svg, { aliases: aliases, reactions: reactions }];
   }
   var api = { render: render, renderHits: renderHits, Drawing: Drawing, py: py, xml: xml, SQUARE: SQUARE, ANCHOR: ANCHOR, fromFrame: fromFrame, toFrame: toFrame,
-    editPoints: editPoints, unit: unit, onBorder: onBorder, width: width, target: target, plainName: plainName };
+    editPoints: editPoints, unit: unit, onBorder: onBorder, width: width, target: target, plainName: plainName, NAME: NAME, GATE: GATE, SYMBOL: SYMBOL, ROLE: ROLE, anchorAt: anchorAt, frontBox: frontBox, compartmentShape: compartmentShape, nameLeft: nameLeft, NAME_PLACES: NAME_PLACES, namePoint: namePoint, namePlaceOf: namePlaceOf };   // GATE: the editor's palette checks its signs against it   // NAME: cd_make.js writes names
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.cdrender = api;
 
   if (typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module) {   // node cdrender.js map.xml out.svg

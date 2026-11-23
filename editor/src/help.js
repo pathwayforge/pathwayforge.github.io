@@ -1,74 +1,81 @@
+import { V } from './state.js';
+import { box, on } from './core.js';
+
     // ---------- How to edit (editor/src/help.js) ----------
-    // The one source of the editor's how-to (user, 2026-11-13: the long text in the Edit window took the room palettes and
+    // The one source of the editor's how-to (a popover, so the Edit window keeps its room for palettes and
     // new tools need): shown as a popover over the map's left edge by the "?" after the tools, or the ? key while
-    // editing; never open by itself (user, 2026-11-13: the switch to edit stays clean, who needs it clicks). A tool added
-    // or changed gets its line here in the same change. Each section: a title ('' for none) and lines, or [key, what] pairs.
-    var HELP = [
-      ['', 'This tool is designed for improving the layout of a map. Moves are saved by themselves; the site shows them about two minutes later.'],
-      ['Move and zoom', ['A drag on empty space moves the map.', 'Two-finger scrolling or a pinch zooms.', 'A right click opens the same menu as outside edit mode.']],
-      ['Select', ['A click selects a node, an arc or a bend point; a second click without a drag deselects it.',
-        'Shift with a drag on empty space selects an area.', 'Shift with a click adds to the selection.']],
-      ['Move what is selected', ['A drag moves what is selected.', 'Arrow keys move by 1, with Shift by 10.',
-        'Grid size, beside the Grid and Snap switches (8 by default; its arrow offers 4, 8, 16, 32 and 64, any whole number typed), sets the grid drawn and its snapping. With Snap to grid on (the magnet), a node dragged puts its centre on the grid and a bend point goes on half of it. Alt held, no snapping.',
-        'With Settings, Editing on Full, a line\'s end dragged onto another node that can take it moves the line there; the node is lit while the pointer is over it, and dropped anywhere else the end goes back. An end never goes to a member inside a complex: the complex takes it. A logic gate takes only the line without an arrowhead as its input; its modulations leave from it. On a CellDesigner map an end at a species goes to another species or complex; the end at the process glyph stays. On a CellDesigner map, right-click an added reactant\'s or product\'s line and choose Make main reactant or Make main product to swap it with the main one (in Layout too: the network stays).',
-        'A line\'s end dragged, or moved by the arrow keys, goes to the node\'s centre or the middle of a side. On a CellDesigner map a modifier\'s end at a process glyph goes to one of the six places CellDesigner has there: the corners and the middles of the two sides off the main line.',
-        'A process or logic gate is one object with its two ports: what it consumes ends on one, what it makes leaves from the other, and they move with it. A modifier\'s end goes to the middle of one of its two sides off the ports. A right click on it turns it a quarter clockwise (Turn process), four turns round.',
-        'A right click on a line adds a bend point there; on a bend point, removes it. A right click on empty map space offers Remove all bend points, which takes every bend point of the map away at once, and the whole map\'s tools: Snap map to grid, Pack all complexes, Show grid and Snap to grid.']],
-      ['Make (Settings, Editing: Full; SBGN-ML maps)', ['The palette makes a macromolecule (80 by 40), a simple chemical (a 40 by 40 circle), a nucleic acid feature, an unspecified entity, a perturbing agent (each 80 by 40), a complex (144 by 64, empty), an empty set (32 by 32), a phenotype (120 by 40), a submap (120 by 64) or a compartment (400 by 320, border 2, under what is already there), at the map\'s scale and in the style most of its kind use there. A new glyph goes into the compartment it is put in, and beside a complex, not into it. A click on a sign of the palette takes it for one use: a click on the map puts it there. A double click keeps it in hand for several, until the sign is clicked again or Esc. A sign can also be dragged onto the map.',
-        'Add state variable in the right-click menu over a macromolecule puts an empty one on the next free place: the bottom\'s middle, right and left of it, the sides, the corners, then the top (kept for units of information). A state variable is selected by a click and dragged from place to place round the border (each side in eighths, the corners included). The arrow keys move it round the border by 1, with Shift by 10: along a side as the arrow points, across it clockwise inward and anticlockwise outward; a key held goes on round the corners.',
-        'Add unit of information in the same menu puts an empty one on the top, the size of N:2, selected; a double click on it types its text, whatever it is (N:3, mt:prot, ct:mRNA), nothing is offered. Units sit along the top, spread evenly, and move apart again when one is added or deleted.',
-        'Make multimer in the same menu draws the macromolecule as a multimer; Make macromolecule makes it single again. A count is a unit of information typed by hand (N:2).',
-        'A process, an omitted process or an uncertain process is made as a bare square (18 by 18 at the map\'s scale): its antennas come with its first arc. Its right-click menu makes it one of the other two kinds; Delete removes it with its arcs.',
-        'A logic gate (AND, OR, NOT, or the equivalence, \u2261) is made bare as a process is (30 by 30 at the map\'s scale), its antennas grown by its arcs. The right-click menu over AND, OR or NOT makes it one of the other two; Delete removes it with its arcs.',
-        'PD and AF above the palette choose the notation: Process Description, or Activity Flow (activities joined by influences, a logic arc into a gate; no processes, empty set, consumption, production or catalysis; the delay, \u03c4, among the logic gates). The map decides which: a map with a process takes PD, one with activities and influences and no process takes AF, an empty map either. Under PD, Hybrid links in the palette lets a modulation end on an entity and a logic gate\u2019s output go to one, as CellDesigner\u2019s reduced notation does; the file stays Process Description. It is kept for each map in this browser, and is ticked until unticked. AF\u2019s Activity nodes, all of one size: Activity, with no unit of information (a protein\u2019s activity), then the activities of a protein, a metabolite, a nucleic acid feature, a complex and an unspecified entity, each with its unit of information; in the CellDesigner view the same activities, under the same names, are drawn as the entities themselves, with no bare Activity. The right-click menu over an activity gives it another unit or takes its unit off; the one over the map adds a unit to every activity whose kind is known and is not a protein\u2019s. On an Activity Flow map, or an empty one under AF, two views are chosen in the two rows under PD and AF, CellDesigner view (reduced notation) and SBGN AF view (Activity Flow): the SBGN view draws every activity as a sharp rectangle with its unit of information small at its top right; the CellDesigner view draws each as its entity (an activity with no unit or a protein\u2019s as a macromolecule, a metabolite\u2019s as a simple chemical). Under AF a unit of information is only the sign of the entity\u2019s kind, with no text, and nothing is typed into it; the name goes in the activity\u2019s box. The view changes the drawing only, never the file, and is kept for each map in this browser. An Activity Flow map is saved as SBGN Activity Flow whichever view it is drawn in: biological activities, influences under their AF names; an empty map on which an activity is drawn becomes an Activity Flow map.',
-        'Under PD the palette has two nucleic acid features, one made with the unit of information ct:gene and one with ct:mRNA, as CellDesigner has a gene and an RNA; the unit is retyped or deleted as any other. A right click on a nucleic acid feature offers Add unit of information (empty), and Add unit of information ct:mRNA or ct:gene; it takes no state variable.',
-        'A simple chemical takes no state variable or unit of information. Nothing asks for a name when it is made: a double click on a glyph (the empty set has no name; a compartment by its top band), a state variable or a unit of information, or a click on one already selected, edits its text in place (P, or P@S505 with the site). Enter keeps it, Esc not.',
-        'Delete, or Delete in the right-click menu, removes the state variable or unit of information, or the glyphs selected that the palette makes (a compartment only when nothing is in it), with their lines.',
-        'A glyph the palette makes, selected, is resized by dragging one of its eight handles: its width and height change in multiples of Grid size, Alt or Ctrl held for any size. Its state variables and units of information keep their places on the border.',
-        'Properties, under the palette, shows the macromolecule or simple chemical selected: its label, width and height (a number typed gives that size, its centre kept), fill colour, border colour and width, and whether it is a multimer. A field is applied on Enter or when it is left, Esc puts it back; a colour is typed as its hex (an empty fill is none) or chosen from the swatch. Set as default gives the next ones of that kind made from the palette this size and look.']],
-      ['Connecting arcs', ['With Settings, Editing on Full, on an SBGN-ML map: a drag from an entity, a process, a logic gate or a phenotype not selected draws an arc to the node where it is let go; a click still selects. The map moves by a drag on empty space.',
-        'The kind is guessed from the two ends: from an entity into a process a consumption, ending on its port in; from a process to an entity a production, leaving from its port out. From an entity to an entity, a process is made midway (on the grid with Snap to grid on) with both arcs, one step to undo.',
-        'An entity let go on a side off the antennas of a process that has them makes a modulation, ending at the middle of that side: a catalysis from a macromolecule or complex onto a process that consumes a simple chemical, else a stimulation. An entity to a phenotype is a stimulation too.',
-        'Into a logic gate, from an entity or from another gate, the line without an arrowhead (a logic arc); out of a gate to a process or a phenotype a stimulation. An equivalence takes entities only and its one line out goes to an entity.',
-        'With AF chosen, a line from one entity to another is a positive influence (a stimulation), or the influence picked; a logic gate\u2019s output may go to an entity too. A delay takes one input.',
-        'A right click on a modulation makes it another: modulation, stimulation, catalysis, inhibition or necessary stimulation.',
-        'A process\'s first arc sets its axis, horizontal or vertical, whichever is nearer the side it comes from, and grows the antenna on that side; the other antenna grows when an arc is attached there. The second arc sets the axis again from both ends, unless the process was turned by hand (Turn process).',
-        'A sign picked in Connecting arcs makes that kind only, from any node, selected or not (between two entities nothing: the process between them is made with no sign picked); a modulation picked goes from an entity or a gate to a process or a phenotype. A click on the sign takes it for one arc, a double click keeps it for several, until a click on it again or Esc.',
-        'Nothing is made between two processes, out of a phenotype, over empty space, or where the same arc is there already; the reason is said under the tools. Esc while drawing lets it go.',
-        'A new arc is selected: Delete takes it back. Delete, or Delete in the right-click menu over a line, removes the arcs selected, the map\'s own too.']],
-      ['Layout tools', ['The dotted square puts the whole map on the grid by the layout rules (complexes packed, rows and columns kept), one step to undo.',
-        'The complex with two proteins packs the complex selected (or the one round a member selected), every complex when nothing is selected.']],
-      ['Keys', [['Ctrl or Cmd Z', 'undo'], ['Ctrl or Cmd Y', 'redo'], ['Ctrl or Cmd S', 'save at once'], ['Ctrl or Cmd A', 'select all'], ['Esc', 'clear the selection'],
-        ['Delete', 'remove the bend point, state variable, unit of information, glyph or arc selected'], ['E', 'switch between edit and view mode (not while typing in a field)'], ['?', 'this help']]]
-    ];
-    var helpBtn = box.querySelector('#m2-ed-help'), helpBox = null;
+    // editing; never open by itself (the switch to edit stays clean). A gesture or menu item not easy to find, added
+    // or changed, gets its row here in the same change.
+    // Short on purpose: only what a person would not find by trying (a drag moves, a handle resizes, Delete removes stay
+    // out); each section a title, a header row or null, and rows of a gesture, what it does and, in Less obvious, the
+    // maps it applies to.
+    var MOD;
+    function __run1() {   // run at start, in order (__start)
+    MOD = /mac|iphone|ipad|ipod/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent) ? 'Cmd' : 'Ctrl';
+    }
+    function helpList() {
+      return [
+        ['While editing', null, [
+          ['Click, then drag', 'an item is selected first, then moved'],
+          ['Drag on empty space or an item not selected', V.grab === false ? 'selects an area in place of the selection' : 'moves the map, as outside editing'],
+          ['Shift + click, Shift + drag', 'adds an item or an area to the selection; Shift + click takes an item out'],
+          ['Shift + drag on what is selected', 'moves it by itself, out of what holds it'],
+          ['Arrow keys', 'move what is selected by 1, with Shift by 10'],
+          [MOD + ' + Z, ' + MOD + ' + Shift + Z or ' + MOD + ' + Y', 'undo, redo the last change, of the map or of a setting'],
+          [MOD + ' + S', 'save at once'],
+          ['Delete', 'remove what is selected, where it can be removed'],
+          ['E', 'switch between editing and viewing']]],
+        ['Less obvious', ['Gesture', 'What it does', 'Maps'], [
+          ['Double click a palette sign', 'keeps it in hand for several uses, Esc lets go', 'all'],
+          ['Drag between two entities with Consumption or Production', 'makes the process between them, with both arcs', 'SBGN-ML'],
+          ['A sign kept in hand, dragged between two nodes', 'draws what the two ends call for: consumption, modulation, production', 'SBGN-ML, CellDesigner'],
+          ['Drop a node on a complex', 'makes it a member, the complex packed round it', 'SBGN-ML, CellDesigner'],
+          ['Click an item already selected, or double click', 'types its text in place (P, P@S505)', 'SBGN-ML'],
+          ['Alt held while dragging or resizing', 'no snapping: any place, any size', 'all'],
+          ['Click a line\u2019s end square, then arrow keys', 'moves the end round the node\u2019s outline', 'all'],
+          ['Click a state variable, then arrow keys', 'moves it round the border', 'SBGN-ML, CellDesigner'],
+          ['Right click on a line', 'adds a bend point there, or removes the one clicked', 'all'],
+          ['Right click on empty space', 'Remove all bend points, Snap map to grid, Repack all complexes', 'all'],
+          ['Right click on a complex', 'Name by members (A:B), Repack complex', 'all'],
+          ['Right click on a process', 'Turn process, a quarter clockwise', 'all'],
+          ['Right click on a node or line', 'Change identity: another kind, its lines kept', 'all'],
+          ['Right click on overlapping compartments', 'Bring forward, Send backward', 'SBGN-ML, GraphML'],
+          ['Right click on an added reactant or product', 'Make main reactant, Make main product', 'CellDesigner'],
+          ['Add reactant or Add product, onto a reaction\u2019s line', 'joins a line to a reaction already there', 'CellDesigner'],
+          ['A logic gate sign: click its inputs, then the reaction', 'places the gate where CellDesigner would', 'CellDesigner'],
+          ['Set as default, in Properties', 'the next ones of that kind made this size and look', 'all'],
+          ['Colours, Original', 'puts back the map\u2019s own colours after another choice', 'all']]]
+      ];
+    }
+    var helpBtn, helpBox;
+    function __run2() {   // run at start, in order (__start)
+    helpBtn = box.querySelector('#m2-ed-help'), helpBox = null;
+    }
     function helpBuild() {
       var e = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
       helpBox = document.createElement('div');
       helpBox.id = 'm2-ed-help-box'; helpBox.setAttribute('role', 'dialog'); helpBox.setAttribute('aria-label', 'How to edit'); helpBox.hidden = true;
-      helpBox.innerHTML = '<button type="button" class="m2-ed-help-x" aria-label="Close">×</button>' + HELP.map(function (s) {
-        var body = typeof s[1] === 'string' ? '<p>' + e(s[1]) + '</p>'
-          : Array.isArray(s[1][0]) ? '<dl>' + s[1].map(function (k) { return '<dt>' + e(k[0]) + '</dt><dd>' + e(k[1]) + '</dd>'; }).join('') + '</dl>'
-          : '<ul>' + s[1].map(function (l) { return '<li>' + e(l) + '</li>'; }).join('') + '</ul>';
-        return (s[0] ? '<h4>' + e(s[0]) + '</h4>' : '') + body;
-      }).join('');
+      var table = function (head, rows) { return '<table>' + (head ? '<tr>' + head.map(function (h) { return '<th>' + e(h) + '</th>'; }).join('') + '</tr>' : '') + rows.map(function (r) { return '<tr>' + r.map(function (c) { return '<td>' + e(c) + '</td>'; }).join('') + '</tr>'; }).join('') + '</table>'; };
+      helpBox.innerHTML = '<button type="button" class="m2-ed-help-x" aria-label="Close">\u00d7</button><h3>Editing</h3>' + helpList().map(function (s) { return '<h4>' + e(s[0]) + '</h4>' + table(s[1], s[2]); }).join('');
       document.body.appendChild(helpBox);
       helpBox.querySelector('.m2-ed-help-x').addEventListener('click', function () { help(false); });
     }
     function help(show, at) {   // show: true, false, or undefined to switch; at: a section's title, scrolled to
       if (!helpBox) helpBuild();
       show = show === undefined ? helpBox.hidden : show;
+      if (show) { helpBox.remove(); helpBuild(); }   // built again, so the rows follow Settings (Drag selects an area)
       if (show) {   // over the map's left edge, level with the "?"; on a narrow page under it
         var b = helpBtn.getBoundingClientRect(), p = V.view.getBoundingClientRect();
         helpBox.hidden = false;
-        var w = helpBox.offsetWidth, h = helpBox.offsetHeight, left = Math.max(p.left + 28, b.right + 8), top = b.top;   // past the separator over the map window's edge
-        if (left + w > innerWidth - 16) { left = Math.max(16, Math.min(b.right - w, innerWidth - 16 - w)); top = b.bottom + 6; }
-        helpBox.style.left = left + 'px'; helpBox.style.top = Math.max(16, Math.min(top, innerHeight - 16 - h)) + 'px';
+        var k = V.pz(), w = helpBox.offsetWidth * k, h = helpBox.offsetHeight * k, left = Math.max(p.left + 28, b.right + 8), top = b.top;   // past the separator over the map window's edge
+        if (left + w > V.winW() - 16) { left = Math.max(16, Math.min(b.right - w, V.winW() - 16 - w)); top = b.bottom + 6; }
+        helpBox.style.left = left / k + 'px'; helpBox.style.top = Math.max(16, Math.min(top, V.winH() - 16 - h)) / k + 'px';   // a fixed box in the page's zoomed units
         var h4 = at && Array.prototype.filter.call(helpBox.querySelectorAll('h4'), function (x) { return x.textContent === at; })[0];
         if (h4) helpBox.scrollTop = h4.offsetTop - 8;
       } else helpBox.hidden = true;
       helpBtn.setAttribute('aria-pressed', String(show));
     }
+    function __run3() {   // run at start, in order (__start)
     helpBtn.addEventListener('click', function () { help(); });
     document.addEventListener('keydown', function (ev) {
       if (helpBox && !helpBox.hidden && ev.key === 'Escape') { help(false); ev.stopPropagation(); return; }
@@ -80,3 +87,7 @@
     document.addEventListener('pointerdown', function (ev) {   // a click elsewhere closes it
       if (helpBox && !helpBox.hidden && !helpBox.contains(ev.target) && !helpBtn.contains(ev.target)) help(false);
     }, true);
+    }
+
+    export function __start() { __run1(); __run2(); __run3(); }   // the part's statements, in their order
+    export { help, helpBox };
